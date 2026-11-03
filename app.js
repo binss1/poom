@@ -1,0 +1,394 @@
+'use strict';
+const SIM=!!window.POOM_SIM, NS=SIM?'poom-sim':'poom', VERSION='1.0.0', KEY=NS+'.db';
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const toStr=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d,12)};
+const add=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return toStr(d)};
+const diff=(a,b)=>Math.round((parse(a)-parse(b))/864e5);
+let simShift=0;
+const today=()=>add(toStr(new Date()),simShift);
+const nowHM=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const WD=['일','월','화','수','목','금','토'];
+const fmtMD=s=>{const d=parse(s);return `${d.getMonth()+1}/${d.getDate()}`};
+const fmtLong=s=>{const d=parse(s);return `${d.getMonth()+1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일`};
+const fmtYMD=s=>{const d=parse(s);return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`};
+const TYPE={injection:'주사',oral:'경구약',vaginal:'질정',supp:'영양제',other:'기타'};
+const ZONES={LU:'왼쪽 위',LM:'왼쪽 가운데',LL:'왼쪽 아래',RU:'오른쪽 위',RM:'오른쪽 가운데',RL:'오른쪽 아래',L:'왼쪽',R:'오른쪽'};
+const SYM=[['bleedS','소량 출혈'],['bleedL','출혈 많음',1],['pain','아랫배 통증'],['painOne','한쪽 심한 복통',1],['shoulder','어깨끝 통증',1],['dizzy','심한 어지러움',1],['nausea','입덧'],['vomit','구토'],['constip','변비'],['tired','피로'],['headache','두통'],['swell','붓기'],['bruise','주사 부위 멍'],['tight','배뭉침'],['sleep','잠 설침'],['anxious','불안']];
+let db=null,view='today',stack=[],navDepth=0,lastDay='',sheetOpen=false;
+const ui={guide:'week',gw:null,log:'lab',month:null,sel:null,setup:{step:'start'},site:null,kick:null,cont:null,code:''};
+
+/* 저장 */
+const Store={
+ idb(){return new Promise((ok,no)=>{try{const r=indexedDB.open(NS,1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}catch(e){no(e)}})},
+ async get(){let a=null,b=null;
+  try{const d=await this.idb();a=await new Promise(ok=>{const q=d.transaction('kv').objectStore('kv').get('db');q.onsuccess=()=>ok(q.result||null);q.onerror=()=>ok(null)})}catch(e){}
+  try{const t=localStorage.getItem(KEY);if(t)b=JSON.parse(t)}catch(e){}
+  if(a&&b)return (a.updatedAt||0)>=(b.updatedAt||0)?a:b;return a||b},
+ async put(v){let okAny=false;
+  try{localStorage.setItem(KEY,JSON.stringify(v));okAny=true}catch(e){}
+  try{const d=await this.idb();await new Promise((ok,no)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,'db');t.oncomplete=ok;t.onerror=()=>no(t.error)});okAny=true}catch(e){}
+  return okAny},
+ async clear(){try{localStorage.removeItem(KEY)}catch(e){}try{const d=await this.idb();await new Promise(ok=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').delete('db');t.oncomplete=ok;t.onerror=ok})}catch(e){}}
+};
+async function save(){db.updatedAt=Date.now();const ok=await Store.put(db);if(!ok)toast('저장하지 못했습니다. 저장 공간을 확인하고 백업해 주세요.')}
+
+/* 임신 계산 */
+function lmp(){if(!db)return null;const p=db.profile;
+ if(p.baseMode==='edd'&&p.edd)return add(p.edd,-280);
+ if(p.baseMode==='lmp'&&p.lmp)return p.lmp;
+ if(p.transferDate)return add(p.transferDate,-(14+Number(p.embryoDay||0)));return null}
+const ga=(date=today())=>{const l=lmp();return l?diff(date,l):null};
+const edd=()=>{const l=lmp();return l?add(l,280):null};
+const wk=(date=today())=>{const g=ga(date);return g==null?null:Math.floor(g/7)};
+const fmtGA=g=>`${Math.floor(g/7)}주 ${g%7}일`;
+const multi=()=>Number(db.profile.fetus)>=2;
+const born=()=>!!db.profile.birthDate;
+
+/* 약 일정 */
+const active=(m,d)=>d>=m.start&&(!m.end||d<=m.end);
+function slotsFor(date){const out=[],recs=db.doses[date]||{},used=new Set();
+ for(const m of db.meds){if(!active(m,date))continue;
+  for(const s of m.slots){const key=m.id+'|'+s.id;used.add(key);out.push({key,m,s,time:s.time,rec:recs[key]})}}
+ for(const key of Object.keys(recs)){if(used.has(key))continue;const r=recs[key];
+  out.push({key,m:{id:key.split('|')[0],name:r.name,dose:r.dose,type:r.type,slots:[],note:''},s:{id:key.split('|')[1],label:r.label||'',time:r.time},time:r.time||'',rec:r})}
+ return out.sort((a,b)=>(a.time||'').localeCompare(b.time||'')||a.m.name.localeCompare(b.m.name))}
+function dayStat(date){const items=slotsFor(date);let due=0,done=0;const by={};
+ for(const i of items){const t=i.m.type;by[t]=by[t]||{due:0,done:0};by[t].due++;due++;if(i.rec){by[t].done++;done++}}
+ return{due,done,by,items}}
+function record(date,i,o){db.doses[date]=db.doses[date]||{};const prev=db.doses[date][i.key]||{};
+ db.doses[date][i.key]=Object.assign(prev,{s:'done',name:i.m.name,dose:i.m.dose,type:i.m.type,time:i.time,label:i.s.label},o)}
+function clearDose(date,key){if(db.doses[date]){delete db.doses[date][key];if(!Object.keys(db.doses[date]).length)delete db.doses[date]}}
+function siteLog(){const a=[];for(const d of Object.keys(db.doses))for(const k of Object.keys(db.doses[d])){const r=db.doses[d][k];if(r.site&&r.s==='done')a.push({date:d,at:r.at||'',site:r.site,name:r.name,memo:r.memo||''})}
+ return a.sort((x,y)=>(y.date+y.at).localeCompare(x.date+x.at))}
+function suggestSite(){const log=siteLog();if(!log.length)return null;const side=log[0].site[0]==='L'?'R':'L';
+ const order=[side+'M',side+'U',side+'L'];let best=order[0],bestAge=-1;
+ for(const z of order){const f=log.findIndex(x=>x.site===z);const age=f<0?1e6:f;if(age>bestAge){bestAge=age;best=z}}return best}
+function lastInjection(){let best=null;for(const d of Object.keys(db.doses))for(const k of Object.keys(db.doses[d])){const r=db.doses[d][k];if(r.type==='injection'&&r.s==='done'){const v=d+' '+(r.at||'');if(!best||v>best.v)best={v,date:d,at:r.at,name:r.name,dose:r.dose,site:r.site}}}return best}
+function remaining(m){if(m.stock==null||m.stock==='')return null;let used=0;for(const d of Object.keys(db.doses)){if(d<(m.stockDate||'0'))continue;for(const k of Object.keys(db.doses[d]))if(k.split('|')[0]===m.id&&db.doses[d][k].s==='done')used++}return Number(m.stock)-used}
+function gapMsg(date,i,at){if(!i.m.gap||!at)return'';const list=[];for(const d of [add(date,-1),date]){const r=db.doses[d]||{};for(const k of Object.keys(r))if(k.split('|')[0]===i.m.id&&k!==i.key&&r[k].s==='done'&&r[k].at)list.push(d+' '+r[k].at)}
+ list.sort();const p=list[list.length-1];if(!p)return'';const[pd,pt]=p.split(' ');const h=(diff(date,pd)*1440+hm(at)-hm(pt))/60;if(h<=0)return'';
+ return h<i.m.gap[0]||h>i.m.gap[1]?`이번 간격 ${h.toFixed(1)}시간, 처방 간격 ${i.m.gap[0]}~${i.m.gap[1]}시간`:''}
+const hm=t=>{const[a,b]=t.split(':').map(Number);return a*60+b};
+
+/* 추천 */
+function exStage(date){const p=db.profile;if(p.activity==='rest')return EX_REST;if(p.activity==='limited')return EX_LIMIT;if(born())return EX_PP;
+ const w=Math.max(4,wk(date)||4);return EX_STAGES.find(s=>w>=s.from&&w<=s.to)||EX_STAGES[EX_STAGES.length-1]}
+function exToday(date){const st=exStage(date),idx=(parse(date).getDay()+6)%7;return{st,id:st.plan[idx],s:EX[st.plan[idx]]}}
+function mealStage(date){const w=Math.max(4,wk(date)||4);return MEAL_STAGES.find(s=>w>=s.from&&w<=s.to)||MEAL_STAGES[3]}
+const mealDay=date=>{const st=mealStage(date);return{st,m:st.days[(parse(date).getDay()+6)%7]}};
+const dayObj=d=>(db.days[d]=db.days[d]||{});
+function msRange(m){const l=lmp();return[add(l,Math.round(m.from*7)),add(l,Math.round(m.to*7))]}
+function msVisible(m){const p=db.profile;if(m.tag==='다태'&&Number(p.fetus)===1)return false;if(m.id==='rh'&&p.rh==='+')return false;return true}
+function nextMs(){if(!lmp())return null;const t=today();return MILESTONES.filter(msVisible).find(m=>!db.checks[m.id]&&msRange(m)[1]>=t)||null}
+function nextAppt(){const t=today();return db.appts.filter(a=>a.date>=t).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')))[0]||null}
+
+/* 공통 조각 */
+const I={chev:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="chev" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+ back:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
+ next:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+ check:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+ dash:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M6 12h12"/></svg>',
+ today:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="8.2"/><path d="M8.2 12.3l2.6 2.6 5-5.2"/></svg>',
+ cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg>',
+ guide:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 4.5h10a2 2 0 012 2V20H8a2 2 0 01-2-2z"/><path d="M6 18a2 2 0 012-2h10M10 8.5h4"/></svg>',
+ log:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 18l5-6 4 3 7-9"/><path d="M4 21h16"/></svg>',
+ more:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h16M4 12h16M4 17h16"/></svg>'};
+const liBtn=(a,t,s,extra='')=>`<button class="li" data-a="${a}" ${extra}><span class="grow"><span class="t">${t}</span>${s?`<br><span class="s">${s}</span>`:''}</span>${I.chev}</button>`;
+const seg=(act,cur,items)=>`<div class="seg" role="tablist">${items.map(([k,l])=>`<button role="tab" aria-selected="${k===cur}" class="${k===cur?'on':''}" data-a="${act}" data-v="${k}">${l}</button>`).join('')}</div>`;
+const lst=(c,t,a)=>a&&a.length?`<div class="lst ${c}"><h3>${t}</h3><ul>${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:'';
+const fld=(id,label,type,val,attr='')=>`<div class="fld"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(val==null?'':val)}" ${attr}></div>`;
+const sel=(id,label,val,opts)=>`<div class="fld"><label for="${id}">${label}</label><select id="${id}">${opts.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(val)?'selected':''}>${l}</option>`).join('')}</select></div>`;
+function doseRow(date,i){const r=i.rec,done=r&&r.s==='done',skip=r&&r.s==='skip',t=today(),isToday=date===t;
+ const late=isToday&&!r&&i.time&&hm(nowHM())-hm(i.time)>60&&!SIM_noLate();
+ let sub=[];if(i.m.dose)sub.push(esc(i.m.dose));
+ if(done)sub.push(r.at?`${r.at} 완료`:'완료');if(skip)sub.push('건너뜀');
+ if(r&&r.site)sub.push(ZONES[r.site]);
+ if(late)sub.push('<span class="late">시간 지남</span>');
+ if(!r&&i.m.type==='injection'&&!i.m.noSite){const s=suggestSite();if(s)sub.push('추천 '+ZONES[s])}
+ return `<div class="dose ${done?'done':''} ${skip?'skip':''}"><button class="body" data-a="dose" data-d="${date}" data-k="${esc(i.key)}"><span class="nm"><span class="tag t-${i.m.type}">${TYPE[i.m.type]||'기타'}</span><span class="n">${esc(i.m.name)}</span></span><div class="sub">${sub.join(' · ')}</div></button><button class="tick" aria-label="${esc(i.m.name)} ${done?'완료 취소':'완료'}" data-a="tick" data-d="${date}" data-k="${esc(i.key)}"><span>${done?I.check:skip?I.dash:''}</span></button></div>`}
+const SIM_noLate=()=>simShift!==0||today()===db.profile.trackingStart;
+function doseList(date){const items=slotsFor(date);if(!items.length)return `<div class="list"><div class="li"><span class="s">${db.meds.length?'이 날 예정된 약이 없습니다.':'등록된 약이 없습니다. 더보기의 처방 관리에서 추가하세요.'}</span></div></div>`;
+ let h='<div class="list">',cur=null;for(const i of items){if(i.time!==cur){cur=i.time;h+=`<div class="timeh">${esc(cur||'시각 없음')}${i.s.label?` · ${esc(i.s.label)}`:''}</div>`}h+=doseRow(date,i)}return h+'</div>'}
+
+/* 오늘 */
+function vToday(){const p=db.profile,t=today(),hide=p.hideGuide,g=ga(t),st=dayStat(t),notes=[];
+ let hero=`<div class="hero"><div class="date">${fmtLong(t)}${p.name?` · ${esc(p.name)}님`:''}</div>`;
+ if(!hide&&g!=null){if(born()){hero+=`<div class="ga">산후 ${diff(t,p.birthDate)}<small>일</small></div>`}else{const dday=diff(edd(),t);
+  hero+=`<div class="ga">${Math.floor(g/7)}<small>주</small> ${g%7}<small>일</small></div><div class="herosub">출산 예정일 ${fmtYMD(edd())} · ${dday>=0?'D-'+dday:'D+'+(-dday)}${p.fetus&&p.fetus!=='unknown'?` · 아기 ${esc(p.fetus)}명`:''}</div><div class="track" aria-hidden="true"><i></i><b style="width:${Math.min(100,g/280*100).toFixed(1)}%"></b><u style="left:${(14*7/280*100).toFixed(1)}%"></u><u style="left:${(28*7/280*100).toFixed(1)}%"></u></div><div class="tracklab"><span>초기</span><span>중기 14주</span><span>후기 28주</span><span>40주</span></div>`}}
+ hero+='</div>';
+ const late=st.items.filter(i=>!i.rec&&i.time&&hm(nowHM())-hm(i.time)>60&&!SIM_noLate());
+ if(late.length)notes.push(`<div class="note warn"><b>시간이 지난 약 ${late.length}건</b><span>이미 했다면 눌러서 기록하세요. 놓쳤다면 두 번 쓰지 말고 병원에 확인하세요.</span></div>`);
+ if(t===p.trackingStart&&!SIM&&st.done<st.due)notes.push(`<div class="note info"><b>오늘이 첫날입니다</b><span>오늘 이미 한 약은 눌러서 기록하세요. 지난 날짜 기록은 달력에서 넣을 수 있습니다.</span></div>`);
+ const dg=(db.days[t]||{}).sym||{};if(SYM.some(s=>s[2]&&dg[s[0]]))notes.push(`<button class="note bad" data-a="go" data-v="emergency" style="text-align:left"><b>위험 신호가 기록되었습니다</b><span>담당 병원에 바로 연락하세요. 응급 카드 열기</span></button>`);
+ for(const m of db.meds){if(!active(m,t))continue;const r=remaining(m);if(r!=null&&m.slots.length&&r<=m.slots.length*3)notes.push(`<div class="note warn"><b>${esc(m.name)} ${r}회분 남음</b><span>다음 처방이나 구매를 확인하세요.</span></div>`)}
+ if(!SIM){const lb=db.lastBackup?diff(t,db.lastBackup):diff(t,p.trackingStart);if(lb>=14)notes.push(`<button class="note info" data-a="go" data-v="backup" style="text-align:left"><b>${db.lastBackup?`마지막 백업 ${lb}일 전`:'아직 백업하지 않았습니다'}</b><span>폰을 바꿔도 기록을 살릴 수 있게 백업하세요.</span></button>`)}
+ const appts=db.appts.filter(a=>a.date===t);
+ const pct=st.due?Math.round(st.done/st.due*100):0;
+ let h=`<div class="stack">${hero}${notes.join('')}<section class="sec"><div class="sech"><h2>오늘의 약과 주사</h2><span class="small muted num">${st.done}/${st.due}</span></div><div class="bar" aria-hidden="true"><i style="width:${pct}%"></i></div>${doseList(t)}</section>`;
+ if(appts.length)h+=`<section class="sec"><div class="sech"><h2>오늘 일정</h2></div><div class="list">${appts.map(apptRow).join('')}</div></section>`;
+ if(!hide&&lmp()){const w=clampW(wk(t)),wd=WEEKS[w],ms=nextMs(),ex=exToday(t),dd=db.days[t]||{},md=dd.meal||{},ml=Object.keys(md).filter(k=>md[k]).length;
+  h+=`<section class="sec"><div class="sech"><h2>오늘 챙길 것</h2></div><div class="list">`;
+  if(!born())h+=liBtn('tab" data-v="guide',`${w}주: ${esc(wd.head)}`,ms?`다음 ${esc(ms.title)} ${fmtMD(msRange(ms)[0])}~${fmtMD(msRange(ms)[1])} 예상`:'');
+  h+=liBtn('exSheet',`운동: ${esc(ex.s.t)}`,dd.ex&&dd.ex.done?'완료':ex.s.min?`${ex.s.min}분 · ${ex.s.lv}`:'쉬어가는 날');
+  h+=liBtn('mealSheet','식단과 물',`끼니 ${ml}/5 · 물 ${dd.water||0}컵`);
+  h+='</div></section>'}
+ const dd2=db.days[t]||{},sc=Object.keys(dd2.sym||{}).filter(k=>dd2.sym[k]).length;
+ const nx=nextAppt();
+ h+=`<section class="sec"><div class="list">${liBtn('bodySheet','오늘 몸 상태',sc?`증상 ${sc}개 기록`+(dd2.weight?` · ${dd2.weight}kg`:''):(dd2.weight?`${dd2.weight}kg`:'증상, 체중, 혈압 기록'))}${nx&&nx.date!==t?liBtn('tab" data-v="cal',`다음 일정: ${esc(nx.title)}`,`${fmtLong(nx.date)}${nx.time?' '+nx.time:''}`):''}</div></section></div>`;
+ return h}
+function apptRow(a){return `<button class="li" data-a="apptSheet" data-id="${a.id}"><span class="tag t-${a.kind==='procedure'?'procedure':'visit'}">${a.kind==='procedure'?'시술':'내원'}</span><span class="grow"><span class="t">${esc(a.title)}</span>${a.time||a.note?`<br><span class="s">${esc([a.time,a.note].filter(Boolean).join(' · '))}</span>`:''}</span>${I.chev}</button>`}
+const clampW=w=>Math.min(41,Math.max(4,w==null?4:w));
+
+/* 달력 */
+function vCal(){const t=today();ui.sel=ui.sel||t;ui.month=ui.month||t.slice(0,7);const[y,m]=ui.month.split('-').map(Number),first=new Date(y,m-1,1,12),days=new Date(y,m,0).getDate(),lead=first.getDay();
+ let c=WD.map((d,i)=>`<div class="wd ${i===0?'sun':''}">${d}</div>`).join('');for(let i=0;i<lead;i++)c+='<div class="cell other"></div>';
+ const l=lmp();for(let d=1;d<=days;d++){const s=`${y}-${pad(m)}-${pad(d)}`,f=s<=t?dayStat(s):{by:{}},ap=db.appts.filter(a=>a.date===s);let dots='';
+  for(const k of ['injection','oral','vaginal','supp','other'])if(f.by[k]){const fin=f.by[k].done>=f.by[k].due;dots+=`<i class="dot c-${k} ${fin?'f':''}"></i>`}
+  for(const a of ap)dots+=`<i class="dot f c-${a.kind==='procedure'?'procedure':'visit'}"></i>`;
+  const newWk=l&&!db.profile.hideGuide&&diff(s,l)>=0&&diff(s,l)%7===0&&diff(s,l)<=294;
+  const lab=`${d}일, 완료 ${f.done||0}/${f.due||0}`;
+  c+=`<button class="cell ${s===t?'today':''} ${s===ui.sel?'sel':''}" data-a="pick" data-v="${s}" aria-label="${lab}"><span class="d">${d}</span>${newWk?`<span class="wk">${diff(s,l)/7}주</span>`:''}<span class="dots">${dots}</span></button>`}
+ const s=ui.sel,dd=db.days[s]||{},syms=SYM.filter(x=>(dd.sym||{})[x[0]]).map(x=>x[1]),ap=db.appts.filter(a=>a.date===s),labs=db.labs.filter(x=>x.date===s),g=ga(s);
+ let d=`<section class="sec"><div class="sech"><h2>${fmtLong(s)}</h2><span class="small muted num">${g!=null&&g>=0&&!db.profile.hideGuide?fmtGA(g):''}</span></div>${s<=t?doseList(s):upcomingNote(s)}`;
+ if(ap.length)d+=`<div class="list">${ap.map(apptRow).join('')}</div>`;
+ const info=[];if(syms.length)info.push(['몸 상태',esc(syms.join(', '))]);if(dd.weight)info.push(['체중',esc(dd.weight)+'kg']);if(dd.bp)info.push(['혈압',esc(dd.bp)]);if(dd.ex&&dd.ex.done)info.push(['운동',esc(dd.ex.t||'완료')+(dd.ex.min?` ${esc(dd.ex.min)}분`:'')]);if(dd.note)info.push(['메모',esc(dd.note)]);if(dd.water)info.push(['물',esc(dd.water)+'컵']);
+ for(const x of labs)info.push([esc(x.name),esc(x.value)+' '+esc(x.unit||'')]);
+ if(info.length)d+=`<div class="list">${info.map(([a,b])=>`<div class="li"><span class="small muted" style="width:62px;flex:none">${a}</span><span class="grow">${b}</span></div>`).join('')}</div>`;
+ if(s<=t)d+=`<button class="btn sec2" data-a="bodySheet" data-d="${s}">이 날 몸 상태 기록</button>`;
+ d+=`<button class="btn sec2" data-a="apptSheet" data-d="${s}">이 날 일정 추가</button></section>`;
+ return `<div class="stack"><div class="calh"><button class="icb" data-a="mon" data-v="-1" aria-label="이전 달">${I.back}</button><div class="m">${y}년 ${m}월</div><button class="icb" data-a="mon" data-v="1" aria-label="다음 달">${I.next}</button></div><div class="cal">${c}</div><div class="legend"><span><i class="dot f c-injection"></i>주사</span><span><i class="dot f c-oral"></i>경구약</span><span><i class="dot f c-vaginal"></i>질정</span><span><i class="dot f c-procedure"></i>시술</span><span><i class="dot f c-visit"></i>내원</span><span><i class="dot"></i>빈 원은 미완료</span></div>${d}</div>`}
+function upcomingNote(s){const n=slotsFor(s).length;return `<div class="note info"><span>이 날 예정된 약은 ${n}건입니다. 당일에 기록할 수 있습니다.</span></div>`}
+
+/* 주차 안내 */
+function vGuide(){const t=today();ui.gw=ui.gw||clampW(wk(t));if(!lmp())return `<div class="stack"><div class="ptitle">주차 안내</div><div class="note info"><span>설정에서 이식일이나 출산 예정일을 입력하면 주차별 안내가 표시됩니다.</span></div><button class="btn" data-a="go" data-v="settings">설정 열기</button></div>`;
+ const tab=ui.guide;let b='';
+ if(tab==='week'){const w=ui.gw,x=WEEKS[w],l=lmp(),a=add(l,w*7),e=add(a,6),mn=MULTI_NOTES.find(n=>w>=n[0]&&w<=n[1]);
+  b=`<div class="weekbar"><button class="icb" data-a="gw" data-v="-1" aria-label="이전 주">${I.back}</button><div class="grow" style="text-align:center"><div class="w">${w}주${w===wk(t)?' <span class="small muted">이번 주</span>':''}</div><div class="small muted num">${fmtMD(a)}~${fmtMD(e)}</div></div><button class="icb" data-a="gw" data-v="1" aria-label="다음 주">${I.next}</button></div>
+  <h2 style="font:700 1.25rem/1.3 var(--d)">${esc(x.head)}</h2><div class="small muted">아기 크기 ${esc(x.baby)} (대략)</div><div class="prose">${lst('c','확인할 일',x.check)}${lst('g','고려할 점',x.consider)}${lst('w','주의할 점',x.caution)}</div>`;
+  if(mn&&Number(db.profile.fetus)!==1)b+=`<div class="note info"><b>다태 임신이라면</b><span>${esc(mn[2])}</span></div>`;
+  b+=`<div class="small faint">주수는 입력한 기준으로 계산합니다. 병원 안내가 다르면 병원을 따르세요.</div>`}
+ if(tab==='sched'){b=`<div class="list">`+MILESTONES.filter(msVisible).map(m=>{const[a,e]=msRange(m);const pass=e<t&&!db.checks[m.id];return `<label class="li" style="cursor:pointer"><input type="checkbox" style="width:22px;height:22px;accent-color:var(--acc);flex:none" data-c="ms" data-v="${m.id}" ${db.checks[m.id]?'checked':''}><span class="grow"><span class="t">${esc(m.title)}</span> <span class="tag t-other">${esc(m.tag)}</span><br><span class="s num">${a===e?fmtYMD(a):`${fmtMD(a)}~${fmtMD(e)}`}${m.note?' · '+esc(m.note):''}${pass?' · 지난 일정':''}</span></span></label>`}).join('')+`</div><div class="small faint">날짜는 예상 범위입니다. 실제 날짜는 병원 안내를 달력에 입력하세요.</div>`}
+ if(tab==='ex'){const st=exStage(t),idx=(parse(t).getDay()+6)%7,names=['월','화','수','목','금','토','일'];
+  b=`<div><h2 style="font:700 1.25rem/1.3 var(--d)">${esc(st.t)}</h2><div class="small muted">목표 ${esc(st.goal)}</div></div><p>${esc(st.note)}</p>`;
+  if(multi()&&wk(t)>=20)b+=`<div class="note warn"><span>다태 임신은 20주 이후 중강도 운동을 병원과 먼저 상의하세요.</span></div>`;
+  b+=`<div class="list">${st.plan.map((id,i)=>{const s=EX[id];return `<button class="li" data-a="exView" data-v="${id}"><span style="width:24px;flex:none;font-weight:700;color:${i===idx?'var(--acc)':'var(--ink2)'}">${names[i]}</span><span class="grow"><span class="t">${esc(s.t)}</span><br><span class="s">${s.min?s.min+'분 · ':''}${esc(s.lv)}</span></span>${I.chev}</button>`}).join('')}</div><div class="prose">${lst('w','바로 멈추고 병원에 알릴 신호',EX_STOP)}${lst('g','피할 운동',EX_AVOID)}</div><div class="small faint">말을 하면서 할 수 있는 강도가 기준입니다. 병원에서 제한했다면 설정에서 운동 제한을 켜세요.</div>`}
+ if(tab==='meal'){const{st,m}=mealDay(t),idx=(parse(t).getDay()+6)%7,names=['월','화','수','목','금','토','일'];
+  b=`<div><h2 style="font:700 1.25rem/1.3 var(--d)">${esc(st.t)}</h2><div class="small muted">${esc(st.energy)} · ${esc(st.focus)}</div></div><div class="prose">${lst('g','이 시기 포인트',st.point)}</div>`;
+  if(db.profile.nausea)b+=`<div class="note info"><b>입덧 모드</b><span>${MEAL_NAUSEA.map(esc).join(' · ')}</span></div>`;
+  b+=st.days.map((dm,i)=>`<details ${i===idx?'open':''}><summary>${names[i]}요일${i===idx?' · 오늘':''}</summary><div>${MEAL_LABEL.map(([k,l])=>`<div><span class="small muted">${l}</span><br>${esc(dm[k])}</div>`).join('')}</div></details>`).join('');
+  b+=`<div class="prose">${lst('w','피할 음식',FOOD_RULES.avoid)}${lst('g','양을 지킬 음식',FOOD_RULES.limit)}${lst('c','먼저 확인할 것',FOOD_RULES.check)}</div><div class="sec"><h2 style="font-size:1rem">임신부 하루 영양 기준</h2><div class="list">${NUTRITION.map(([a,c])=>`<div class="li" style="min-height:42px"><span class="small muted" style="width:82px;flex:none">${a}</span><span class="grow small">${c}</span></div>`).join('')}</div><div class="small faint">2025 한국인 영양소 섭취기준의 임신부 부가량입니다. ${esc(WEIGHT_GOAL)}</div></div>`}
+ return `<div class="stack"><div class="ptitle">주차 안내</div>${seg('gTab',tab,[['week','주차별'],['sched','일정'],['ex','운동'],['meal','식단']])}${b}</div>`}
+
+/* 기록 */
+function vLog(){const t=ui.log;let b='';
+ if(t==='lab'){const by={};for(const x of db.labs)(by[x.name]=by[x.name]||[]).push(x);
+  b=`<button class="btn" data-a="labSheet">수치 추가</button>`;
+  for(const n of Object.keys(by)){const a=by[n].sort((x,y)=>x.date.localeCompare(y.date));
+   b+=`<section class="sec"><div class="sech"><h2>${esc(n)}</h2><span class="small muted">${esc(a[0].unit||'')}</span></div>${a.length>1&&a.every(x=>!isNaN(+x.value))?chart(a.map(x=>({d:x.date,v:+x.value})),{log:/hcg/i.test(n)}):''}<div class="list">${a.slice().reverse().map((x,i,arr)=>{const p=arr[i+1];let m='';if(p&&+p.value>0&&+x.value>+p.value&&/hcg/i.test(n)){const h=diff(x.date,p.date)*24,dbl=h/Math.log2(+x.value/+p.value);if(h>0)m=`직전의 ${(+x.value/+p.value).toFixed(1)}배 · 두 배 시간 약 ${Math.round(dbl)}시간`}return `<button class="li" data-a="labSheet" data-id="${x.id}"><span class="grow"><span class="t num">${esc(x.value)}</span> <span class="s">${fmtYMD(x.date)}</span>${m||x.note?`<br><span class="s">${esc([m,x.note].filter(Boolean).join(' · '))}</span>`:''}</span>${I.chev}</button>`}).join('')}</div></section>`}
+  if(by.hCG||by.HCG)b+=`<div class="small faint">계산값은 참고용입니다. 해석은 병원 설명을 따르세요.</div>`}
+ if(t==='body'){const ws=Object.keys(db.days).sort().filter(d=>db.days[d].weight).map(d=>({d,v:+db.days[d].weight}));const bps=Object.keys(db.days).sort().filter(d=>db.days[d].bp).reverse().slice(0,10);
+  b=`<button class="btn" data-a="bodySheet">오늘 체중·혈압 기록</button><section class="sec"><div class="sech"><h2>체중</h2>${ws.length?`<span class="small muted num">${ws[ws.length-1].v}kg${ws.length>1?` · ${(ws[ws.length-1].v-ws[0].v>=0?'+':'')}${(ws[ws.length-1].v-ws[0].v).toFixed(1)}kg`:''}</span>`:''}</div>${ws.length>1?chart(ws,{}):'<div class="note info"><span>체중을 두 번 이상 기록하면 그래프가 나타납니다.</span></div>'}<div class="small faint">${esc(WEIGHT_GOAL)}</div></section><section class="sec"><div class="sech"><h2>혈압</h2></div>${bps.length?`<div class="list">${bps.map(d=>{const[s,di]=String(db.days[d].bp).split('/').map(Number);const hi=s>=140||di>=90;return `<div class="li" style="min-height:44px"><span class="grow num"><span class="t">${esc(db.days[d].bp)}</span> <span class="s">${fmtMD(d)}</span></span>${hi?'<span class="tag" style="color:var(--bad);background:var(--bad-s)">높음</span>':''}</div>`}).join('')}</div>`:'<div class="note info"><span>20주 이후에는 혈압을 자주 기록해 두면 좋습니다.</span></div>'}</section>`}
+ if(t==='sym'){const ds=Object.keys(db.days).sort().reverse().filter(d=>Object.values(db.days[d].sym||{}).some(Boolean)||db.days[d].note).slice(0,40);
+  b=`<button class="btn" data-a="bodySheet">오늘 증상 기록</button>`+(ds.length?`<div class="list">${ds.map(d=>{const x=db.days[d],l=SYM.filter(s=>(x.sym||{})[s[0]]).map(s=>s[1]);return `<button class="li" data-a="bodySheet" data-d="${d}"><span class="grow"><span class="t num">${fmtMD(d)}</span> <span class="s">${esc(l.join(', '))}</span>${x.note?`<br><span class="s">${esc(x.note)}</span>`:''}</span>${I.chev}</button>`}).join('')}</div>`:'<div class="note info"><span>기록한 증상이 여기에 날짜순으로 쌓입니다.</span></div>')}
+ if(t==='q'){const op=db.questions.filter(q=>!q.done),dn=db.questions.filter(q=>q.done);
+  b=`<div class="row"><input type="text" id="qText" class="grow" placeholder="다음 진료 때 물어볼 내용" aria-label="질문"><button class="btn sm" data-a="qAdd">추가</button></div><div class="list">${op.map(qRow).join('')||'<div class="li"><span class="s">적어둔 질문이 없습니다.</span></div>'}</div>${dn.length?`<details><summary>답을 들은 질문 ${dn.length}건</summary><div>${dn.map(q=>`<div><b>${esc(q.text)}</b>${q.answer?`<br><span class="small muted">${esc(q.answer)}</span>`:''}</div>`).join('')}</div></details>`:''}`}
+ if(t==='kick'){const k=ui.kick,c=ui.cont,hist=db.kicks.slice(-5).reverse(),ch=db.contractions.slice(-6).reverse();let iv='';if(ch.length>=2){const g=[];for(let i=0;i<ch.length-1;i++)g.push((new Date(ch[i].start)-new Date(ch[i+1].start))/6e4);iv=`평균 간격 ${(g.reduce((a,b)=>a+b,0)/g.length).toFixed(1)}분`}
+  b=`<section class="sec"><div class="sech"><h2>태동 세기</h2><span class="small muted">28주부터</span></div><div class="list"><div class="li" style="flex-direction:column;align-items:stretch;gap:10px;padding:14px"><div class="row between"><div class="big-n">${k?k.count:0}<span class="small muted"> / 10회</span></div><div class="small muted">${k?`${new Date(k.start).toTimeString().slice(0,5)} 시작`:'2시간 안에 10회 기준'}</div></div><button class="btn" data-a="kick">${k?'태동 1회':'세기 시작'}</button>${k?'<button class="btn sec2" data-a="kickEnd">마치고 저장</button>':''}</div></div>${hist.length?`<div class="list">${hist.map(h=>`<div class="li" style="min-height:42px"><span class="grow small num">${fmtMD(h.date)} · ${h.count}회 · ${h.min}분</span></div>`).join('')}</div>`:''}<div class="small faint">평소보다 뚜렷하게 줄면 숫자를 채우려 기다리지 말고 병원에 연락하세요.</div></section><section class="sec"><div class="sech"><h2>진통 간격</h2><span class="small muted">${iv}</span></div><button class="btn ${c?'danger':''}" data-a="cont">${c?'진통 끝':'진통 시작'}</button>${ch.length?`<div class="list">${ch.map((x,i)=>{const n=ch[i+1];return `<div class="li" style="min-height:42px"><span class="grow small num">${new Date(x.start).toTimeString().slice(0,5)} · ${Math.round((new Date(x.end)-new Date(x.start))/1000)}초${n?` · 간격 ${((new Date(x.start)-new Date(n.start))/6e4).toFixed(1)}분`:''}</span></div>`}).join('')}<button class="li" data-a="contClear"><span class="s">기록 지우기</span></button></div>`:''}<div class="small faint">언제 병원에 갈지는 병원 안내를 따르세요. 항응고 주사 중이면 주사 전에 먼저 연락하세요.</div></section>`}
+ return `<div class="stack"><div class="ptitle">기록</div>${seg('lTab',t,[['lab','수치'],['body','체중·혈압'],['sym','증상'],['q','질문'],['kick','태동']])}${b}</div>`}
+const qRow=q=>`<div class="li"><input type="checkbox" aria-label="답변 완료" style="width:22px;height:22px;accent-color:var(--acc);flex:none" data-c="qDone" data-v="${q.id}"><span class="grow">${esc(q.text)}</span><button class="link" data-a="qDel" data-v="${q.id}" aria-label="질문 삭제">삭제</button></div>`;
+function chart(pts,o){const W=340,H=170,L=46,R=14,T=16,B=26,xs=pts.map(p=>parse(p.d).getTime()),a=Math.min(...xs),b=Math.max(...xs),X=t=>L+(b===a?0:(t-a)/(b-a))*(W-L-R);
+ let lo,hi,Y,ticks=[];if(o.log){const v=pts.map(p=>Math.log10(Math.max(p.v,.1)));lo=Math.floor(Math.min(...v));hi=Math.ceil(Math.max(...v));if(hi===lo)hi++;Y=x=>T+(hi-Math.log10(Math.max(x,.1)))/(hi-lo)*(H-T-B);for(let i=lo;i<=hi;i++)ticks.push(10**i)}
+ else{const v=pts.map(p=>p.v);lo=Math.min(...v);hi=Math.max(...v);if(hi-lo<2){lo-=1;hi+=1}const st=(hi-lo)/3;lo=Math.floor(lo-st*.2);hi=Math.ceil(hi+st*.2);Y=x=>T+(hi-x)/(hi-lo)*(H-T-B);for(let i=0;i<4;i++)ticks.push(Math.round(lo+(hi-lo)*i/3))}
+ const f=n=>n>=1000?n.toLocaleString('ko-KR'):String(+n.toFixed(1));
+ const g=ticks.map(t=>`<line class="g" x1="${L}" x2="${W-R}" y1="${Y(t).toFixed(1)}" y2="${Y(t).toFixed(1)}"/><text x="${L-6}" y="${(Y(t)+4).toFixed(1)}" text-anchor="end">${f(t)}</text>`).join('');
+ const line=pts.map(p=>`${X(parse(p.d).getTime()).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');const show=pts.length<=5?pts:[pts[0],pts[pts.length-1]];
+ const dots=pts.map(p=>`<circle class="pt" cx="${X(parse(p.d).getTime()).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="3.4"/>`).join('');
+ const labs=show.map(p=>{const x=X(parse(p.d).getTime());return `<text x="${x.toFixed(1)}" y="${H-8}" text-anchor="${x>W-40?'end':x<L+20?'start':'middle'}">${fmtMD(p.d)}</text>`}).join('');
+ return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="수치 변화 그래프">${g}<polyline class="ln" points="${line}"/>${dots}${labs}</svg>`}
+
+/* 더보기 */
+function vMore(){const m=[['emergency','응급 카드','현재 약, 마지막 주사, 연락처'],['meds','처방 관리','약과 주사 추가, 변경, 중단'],['sites','주사 위치 기록','부위별 기록과 주사 방법'],['alarm','알람 맞추기','폰 시계 알람 시간표'],['summary','진료 요약','최근 기록을 복사해 보여주기'],['support','지원 제도','신청할 것 확인'],['backup','백업과 복원','기록 내보내기, 폰 교체'],['settings','설정','이름, 임신 기준, 화면'],['help','도움말','처음 쓰는 방법'],['sources','참고 자료','안내의 근거']];
+ return `<div class="stack"><div class="ptitle">더보기</div><div class="list">${m.map(([k,t,s])=>liBtn('go" data-v="'+k,t,s)).join('')}</div><div class="small faint">품 ${VERSION}${SIM?' · 시뮬레이션':''}. 기록은 이 폰 안에만 저장됩니다.</div></div>`}
+const head=t=>`<div class="row"><button class="icb" data-a="back" aria-label="뒤로" style="margin-left:-10px">${I.back}</button><div class="ptitle grow">${t}</div></div>`;
+function vEmergency(){const p=db.profile,t=today(),g=ga(t),li=lastInjection(),meds=db.meds.filter(m=>active(m,t));const reds=[];
+ if(g!=null&&!born()){if(g<49&&!db.checks.us1)reds.push('early');if(meds.some(m=>m.type==='injection'||/아스피린/.test(m.name)))reds.push('anti');reds.push('clot');if(g>=140)reds.push('pre');if(g>=140&&g<259)reds.push('labor')}reds.push('any');
+ const tel=(n)=>n?`<a href="tel:${esc(n.replace(/[^0-9+]/g,''))}">${esc(n)}</a>`:'<span class="faint">설정에서 입력</span>';
+ const r=(a,b)=>`<div class="li" style="min-height:44px"><span class="small muted" style="width:88px;flex:none">${a}</span><span class="grow">${b}</span></div>`;
+ return `<div class="stack">${head('응급 카드')}<div class="list">${r('이름',esc(p.name)||'-')}${g!=null&&!born()?r('임신 주수',`${fmtGA(g)} · 예정일 ${fmtYMD(edd())}`):''}${r('아기 수',p.fetus&&p.fetus!=='unknown'?esc(p.fetus)+'명':'미확인')}${r('혈액형',esc((p.blood||'')+(p.rh||''))||'미입력')}${p.allergy?r('약 알레르기',esc(p.allergy)):''}${r('마지막 주사',li?`${esc(li.name)} ${esc(li.dose||'')}<br><b class="num">${fmtYMD(li.date)} ${esc(li.at||'시각 미기록')}</b>`:'기록 없음')}</div><section class="sec"><h2 style="font-size:1rem">현재 약</h2><div class="list">${meds.map(m=>`<div class="li" style="min-height:44px"><span class="tag t-${m.type}">${TYPE[m.type]}</span><span class="grow">${esc(m.name)} ${esc(m.dose||'')}</span></div>`).join('')||'<div class="li"><span class="s">없음</span></div>'}</div></section><section class="sec"><h2 style="font-size:1rem">연락처</h2><div class="list">${r(esc(p.hospital||'담당 병원'),tel(p.hospitalTel))}${r(esc(p.guardian||'보호자'),tel(p.guardianTel))}${r('응급','<a href="tel:119">119</a>')}</div></section><section class="sec"><h2 style="font-size:1rem">바로 연락할 신호</h2><div class="prose">${reds.map(k=>lst('w',RED[k].t,RED[k].items)).join('')}</div></section><div class="small faint">이 화면은 의료진에게 보여주는 참고 자료입니다. 의심되면 기다리지 말고 연락하세요.</div></div>`}
+function vMeds(){const t=today(),on=db.meds.filter(m=>!m.end||m.end>=t),off=db.meds.filter(m=>m.end&&m.end<t);
+ const row=m=>{const r=remaining(m);return `<button class="li" data-a="medSheet" data-id="${m.id}"><span class="tag t-${m.type}">${TYPE[m.type]}</span><span class="grow"><span class="t">${esc(m.name)}</span> <span class="s">${esc(m.dose||'')}</span><br><span class="s num">${m.slots.map(s=>esc(s.time)).join(', ')}${m.end?` · ${fmtMD(m.end)}까지`:''}${r!=null?` · ${r}회분 남음`:''}</span></span>${I.chev}</button>`};
+ return `<div class="stack">${head('처방 관리')}<button class="btn" data-a="medSheet">약 또는 주사 추가</button><div class="list">${on.map(row).join('')||'<div class="li"><span class="s">등록된 약이 없습니다.</span></div>'}</div>${off.length?`<section class="sec"><h2 style="font-size:1rem">끝난 처방</h2><div class="list">${off.map(row).join('')}</div></section>`:''}<div class="note info"><span>처방이 바뀌어도 지난 기록은 그대로 남습니다. 복용량과 중단일은 병원 지시대로 입력하세요.</span></div></div>`}
+function vSites(){const log=siteLog().slice(0,30),s=suggestSite(),cnt={};for(const x of siteLog())cnt[x.site]=(cnt[x.site]||0)+1;
+ return `<div class="stack">${head('주사 위치 기록')}<div class="note info"><b>다음 추천: ${s?ZONES[s]:'첫 기록 후 표시'}</b><span>직전과 반대쪽에서 가장 오래 쉰 부위를 추천합니다. 병원 지시가 있으면 따르세요.</span></div>${belly(null,false,cnt)}<section class="sec"><h2 style="font-size:1rem">최근 기록</h2><div class="list">${log.map(x=>`<div class="li" style="min-height:44px"><span class="grow"><span class="t">${ZONES[x.site]}</span> <span class="s num">${fmtMD(x.date)} ${esc(x.at)}</span>${x.memo?`<br><span class="s">${esc(x.memo)}</span>`:''}</span></div>`).join('')||'<div class="li"><span class="s">아직 기록이 없습니다.</span></div>'}</div></section><details><summary>배 주사 방법</summary><div><ol>${INJECT_GUIDE.map(x=>`<li>${esc(x)}</li>`).join('')}</ol><div class="small faint">병원에서 배운 방법이 다르면 병원 방법을 따르세요.</div></div></details></div>`}
+function belly(sel,tap,cnt){const log=siteLog(),last=log[0]?log[0].site:null,rec=suggestSite();
+ const z=(k,c,r)=>{const isLast=last===k;const lab=cnt?`${cnt[k]||0}회`:(rec===k?'추천':isLast?'직전':'');
+  return `<button class="zone ${sel===k?'on':''} ${!cnt&&rec===k?'rec':''} ${!cnt&&isLast?'last':''}" style="grid-column:${c};grid-row:${r}" ${tap?`data-a="zone" data-v="${k}"`:'tabindex="-1" disabled'}>${ZONES[k].replace('왼쪽 ','').replace('오른쪽 ','')}<small>${lab||'&nbsp;'}</small></button>`};
+ return `<div>${!cnt&&log[0]?`<div class="small muted" style="margin-bottom:6px">직전 주사: ${ZONES[log[0].site]} (${fmtMD(log[0].date)})</div>`:''}<div class="row between small muted" style="padding:0 18px 4px"><b>왼쪽</b><b>오른쪽</b></div><div class="belly">${z('LU',1,1)}${z('LM',1,2)}${z('LL',1,3)}${z('RU',3,1)}${z('RM',3,2)}${z('RL',3,3)}<div class="navel"><i></i><span>배꼽 주변 5cm 제외</span></div></div><div class="small faint" style="text-align:center;margin-top:5px">내가 내려다본 방향입니다</div></div>`}
+function vAlarm(){const t=today(),map={};for(const m of db.meds)if(active(m,t))for(const s of m.slots)(map[s.time]=map[s.time]||[]).push(m.name);const ts=Object.keys(map).sort();
+ return `<div class="stack">${head('알람 맞추기')}<p>품은 앱을 닫아둔 상태에서 알림을 보낼 수 없습니다. 아래 시간을 폰 시계 앱에 매일 반복 알람으로 넣어두세요.</p><div class="list">${ts.map(x=>`<div class="li"><span class="t num" style="width:58px;flex:none">${esc(x)}</span><span class="grow s">${map[x].map(esc).join(', ')}</span></div>`).join('')||'<div class="li"><span class="s">약을 등록하면 시간표가 나타납니다.</span></div>'}</div><details><summary>아이폰에서 맞추기</summary><div><ol><li>시계 앱을 엽니다</li><li>알람 탭에서 + 를 누릅니다</li><li>시간을 고르고 반복에서 모든 요일을 선택합니다</li><li>레이블에 약 이름을 적고 저장합니다</li></ol></div></details><details><summary>안드로이드에서 맞추기</summary><div><ol><li>시계 앱을 엽니다</li><li>알람에서 + 를 누릅니다</li><li>시간을 고르고 요일을 모두 선택합니다</li><li>이름에 약 이름을 적고 저장합니다</li></ol></div></details><div class="note info"><span>처방 시간을 바꾸면 알람도 함께 바꿔주세요.</span></div></div>`}
+function summaryText(){const p=db.profile,t=today(),from=add(t,-13),g=ga(t),l=[];l.push(`[품 진료 요약] ${fmtYMD(t)}`);if(p.name)l.push(`이름: ${p.name}`);if(g!=null&&!born())l.push(`임신 ${fmtGA(g)}, 예정일 ${fmtYMD(edd())}, 아기 수 ${p.fetus==='unknown'||!p.fetus?'미확인':p.fetus+'명'}`);
+ l.push('','[현재 처방]');for(const m of db.meds)if(active(m,t))l.push(`- ${m.name} ${m.dose||''} (${m.slots.map(s=>s.time).join(', ')})`);
+ const by={};for(let d=from;d<=t;d=add(d,1)){if(d<p.trackingStart)continue;for(const i of slotsFor(d)){const n=i.m.name;by[n]=by[n]||[0,0];by[n][1]++;if(i.rec&&i.rec.s==='done')by[n][0]++}}
+ l.push('','[최근 14일 복용]');for(const n of Object.keys(by))l.push(`- ${n}: ${by[n][0]}/${by[n][1]}회`);
+ const li=lastInjection();if(li)l.push(`- 마지막 주사: ${fmtYMD(li.date)} ${li.at||''} ${li.site?ZONES[li.site]:''}`);
+ const c={};for(let d=from;d<=t;d=add(d,1)){const s=(db.days[d]||{}).sym||{};for(const x of SYM)if(s[x[0]])c[x[1]]=(c[x[1]]||0)+1}
+ if(Object.keys(c).length){l.push('','[최근 14일 증상]');for(const k of Object.keys(c))l.push(`- ${k}: ${c[k]}일`)}
+ const labs=db.labs.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);if(labs.length){l.push('','[최근 수치]');for(const x of labs)l.push(`- ${fmtMD(x.date)} ${x.name} ${x.value} ${x.unit||''}`)}
+ const q=db.questions.filter(x=>!x.done);if(q.length){l.push('','[물어볼 질문]');for(const x of q)l.push(`- ${x.text}`)}return l.join('\n')}
+function vSummary(){return `<div class="stack">${head('진료 요약')}<textarea id="sumText" rows="16" readonly style="min-height:320px" aria-label="진료 요약">${esc(summaryText())}</textarea><button class="btn" data-a="copy" data-v="sumText">요약 복사</button><div class="small faint">진료실에서 이 화면을 보여주거나 복사해 메모에 붙일 수 있습니다.</div></div>`}
+function vSupport(){return `<div class="stack">${head('지원 제도')}<div class="list">${SUPPORT.map((x,i)=>`<label class="li" style="cursor:pointer"><input type="checkbox" style="width:22px;height:22px;accent-color:var(--acc);flex:none" data-c="sup" data-v="${i}" ${db.checks['sup'+i]?'checked':''}><span class="grow"><span class="t">${esc(x.t)}</span> <span class="tag t-other">${esc(x.when)}</span><br><span class="s">${esc(x.d)}</span><br><span class="s faint">${esc(x.src)}</span></span></label>`).join('')}</div><div class="small faint">금액과 대상은 바뀔 수 있습니다. 신청 전 공식 창구에서 확인하세요. 2026년 11월 기준입니다.</div></div>`}
+function vBackup(){const t=db.lastBackup;return `<div class="stack">${head('백업과 복원')}<div class="note info"><span>기록은 이 폰에만 있습니다. 2주에 한 번 백업 파일을 만들어 폰의 파일 앱에 보관하세요. ${t?`마지막 백업 ${fmtYMD(t)}.`:''}</span></div><section class="sec"><h2 style="font-size:1rem">내보내기</h2>${SIM?'':'<button class="btn" data-a="exportFile">백업 파일 만들기</button>'}<button class="btn sec2" data-a="exportCopy">백업 내용 복사</button><textarea id="bkOut" hidden readonly aria-label="백업 내용"></textarea></section><section class="sec"><h2 style="font-size:1rem">복원</h2><p class="small muted">복원하면 지금 폰의 기록이 백업 내용으로 바뀝니다.</p><div class="fld"><label for="bkFile">백업 파일 선택</label><input id="bkFile" type="file" accept=".json,application/json"></div><div class="fld"><label for="bkText">또는 백업 내용 붙여넣기</label><textarea id="bkText"></textarea></div><button class="btn sec2" data-a="restoreAsk">복원하기</button></section></div>`}
+function vSettings(){const p=db.profile;return `<div class="stack">${head('설정')}<section class="sec"><h2 style="font-size:1rem">기본 정보</h2><div class="stack" style="gap:10px">${fld('sName','이름','text',p.name)}${sel('sBase','임신 기준',p.baseMode,[['transfer','배아 이식일'],['edd','출산 예정일(병원 안내)'],['lmp','마지막 생리 시작일']])}${p.baseMode==='transfer'?`<div class="grid2">${fld('sTrans','이식일','date',p.transferDate)}${sel('sEmb','이식한 배아',p.embryoDay,[[3,'3일 배아'],[5,'5일 배아'],[6,'6일 배아'],[2,'2일 배아']])}</div>`:p.baseMode==='edd'?fld('sEdd','출산 예정일','date',p.edd):fld('sLmp','마지막 생리 시작일','date',p.lmp)}${sel('sFetus','아기 수',p.fetus,[['unknown','미확인'],[1,'1명'],[2,'2명'],[3,'3명']])}${fld('sBirth','출산일(출산 후 입력)','date',p.birthDate)}</div></section><section class="sec"><h2 style="font-size:1rem">응급 카드 정보</h2><div class="stack" style="gap:10px"><div class="grid2">${sel('sBlood','혈액형',p.blood,[['','미입력'],['A','A'],['B','B'],['O','O'],['AB','AB']])}${sel('sRh','Rh',p.rh,[['','미입력'],['+','+'],['-','-']])}</div>${fld('sAllergy','약 알레르기','text',p.allergy)}<div class="grid2">${fld('sHosp','담당 병원','text',p.hospital)}${fld('sHospT','병원 전화','tel',p.hospitalTel)}</div><div class="grid2">${fld('sGuard','보호자','text',p.guardian)}${fld('sGuardT','보호자 전화','tel',p.guardianTel)}</div></div></section><section class="sec"><h2 style="font-size:1rem">안내 방식</h2><div class="stack" style="gap:10px">${sel('sAct','운동 지시',p.activity,[['normal','제한 없음'],['limited','병원에서 운동 제한'],['rest','안정 지시']])}<label class="check"><input type="checkbox" id="sNausea" ${p.nausea?'checked':''}>입덧 모드로 식단 보기</label><label class="check"><input type="checkbox" id="sHide" ${p.hideGuide?'checked':''}><span>주차 안내 숨기기<br><span class="small muted">안내가 부담스러울 때 약 기록과 달력만 남깁니다</span></span></label></div></section><section class="sec"><h2 style="font-size:1rem">화면</h2><div class="stack" style="gap:10px">${SIM?'':sel('sTheme','화면 테마',p.theme,[['system','폰 설정 따르기'],['light','밝게'],['dark','어둡게']])}<label class="check"><input type="checkbox" id="sLarge" ${p.fontLarge?'checked':''}>큰 글씨</label></div></section><button class="btn" data-a="saveSettings">저장</button><section class="sec"><h2 style="font-size:1rem">기록 삭제</h2><button class="btn sec2" data-a="wipeAsk">이 폰의 모든 기록 지우기</button></section></div>`}
+function vHelp(){return `<div class="stack">${head('도움말')}${HELP.map((s,i)=>`<details ${i===0?'open':''}><summary>${esc(s[0])}</summary><div>${s[1]}</div></details>`).join('')}</div>`}
+function vSources(){return `<div class="stack">${head('참고 자료')}<div class="list">${SOURCES.map(([t,u])=>`<a class="li" href="${esc(u)}" target="_blank" rel="noopener"><span class="grow t" style="font-weight:500">${esc(t)}</span>${I.chev}</a>`).join('')}</div><p class="small muted">품은 진단이나 처방을 하지 않습니다. 주차 안내, 운동, 식단은 일반 정보이며 시험관 임신, 다태, 항응고 치료 여부에 따라 달라질 수 있습니다. 담당 의료진의 지시를 우선하세요.</p></div>`}
+
+/* 첫 설정 */
+function installHint(){const ua=navigator.userAgent,iOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),inapp=/KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\//i.test(ua),stand=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+ if(stand)return'';if(inapp)return `<div class="note warn"><b>지금은 앱 안 브라우저입니다</b><span>주소를 복사해 ${iOS?'Safari':'Chrome'}에서 열어주세요. 이 화면에서는 설치할 수 없습니다.</span></div>`;
+ if(iOS)return `<div class="note warn"><b>먼저 홈 화면에 추가하세요</b><span>Safari 아래쪽 공유 버튼 → 홈 화면에 추가 → 웹 앱으로 열기 켜기 → 추가. 그다음 홈 화면의 품 아이콘에서 시작하세요. Safari에서 입력한 내용은 홈 화면 앱으로 넘어가지 않습니다.</span></div>`;
+ return `<div class="note info"><b>홈 화면에 설치하세요</b><span>Chrome 오른쪽 위 ⋮ → 앱 설치 또는 홈 화면에 추가.</span>${window.__bip?'<button class="btn sm" data-a="pwaInstall" style="margin-top:6px">지금 설치</button>':''}</div>`}
+function vSetup(){const u=ui.setup;
+ if(u.step==='start')return `<div class="stack"><div class="hero"><div class="ptitle" style="font-size:2.2rem">품</div><div class="muted">약과 주사, 임신 주차를 한곳에서 챙깁니다. 기록은 이 폰 안에만 저장됩니다.</div></div>${installHint()}<div class="fld"><label for="code">설정 코드</label><textarea id="code" rows="4" placeholder="받은 설정 코드를 붙여넣으세요">${SIM?esc(window.__simCode||''):''}</textarea></div><button class="btn" data-a="codeGo">설정 코드로 시작</button><button class="btn sec2" data-a="manualGo">직접 입력해서 시작</button><button class="btn ghost" data-a="helpFirst">사용 방법 보기</button></div>`;
+ if(u.step==='help')return `<div class="stack"><div class="row"><button class="icb" data-a="setupBack" aria-label="뒤로" style="margin-left:-10px">${I.back}</button><div class="ptitle grow">도움말</div></div>${HELP.map((s,i)=>`<details ${i===0?'open':''}><summary>${esc(s[0])}</summary><div>${s[1]}</div></details>`).join('')}</div>`;
+ const s=u.seed,p=s.profile;
+ return `<div class="stack"><div class="row"><button class="icb" data-a="setupBack" aria-label="뒤로" style="margin-left:-10px">${I.back}</button><div class="ptitle grow">내용 확인</div></div><div class="stack" style="gap:10px">${fld('fName','이름','text',p.name)}<div class="grid2">${fld('fTrans','배아 이식일','date',p.transferDate)}${sel('fEmb','이식한 배아',p.embryoDay||3,[[3,'3일 배아'],[5,'5일 배아'],[6,'6일 배아'],[2,'2일 배아']])}</div><div class="small muted">이식일이 없으면 시작 후 설정에서 예정일을 입력할 수 있습니다.</div></div><section class="sec"><div class="sech"><h2>약과 주사 시간</h2></div>${s.meds.length?`<div class="list">${s.meds.map((m,i)=>`<div class="li" style="flex-wrap:wrap"><span class="tag t-${m.type}">${TYPE[m.type]}</span><span class="grow"><span class="t">${esc(m.name)}</span> <span class="s">${esc(m.dose||'')}</span>${m.note?`<br><span class="s">${esc(m.note)}</span>`:''}</span><span class="row wrap" style="width:100%">${m.slots.map((x,j)=>`<input type="time" aria-label="${esc(m.name)} ${esc(x.label||'')} 시간" data-c="seedTime" data-m="${i}" data-s="${j}" value="${esc(x.time)}" style="flex:1;min-width:120px">`).join('')}</span></div>`).join('')}</div>`:'<div class="note info"><span>약은 시작 후 더보기의 처방 관리에서 추가할 수 있습니다.</span></div>'}</section><button class="btn" data-a="setupDone">시작하기</button></div>`}
+function decodeSetup(t){t=t.trim().replace(/\s+/g,'');if(!/^POOM1\./.test(t))throw new Error('code');const b=t.slice(6).replace(/-/g,'+').replace(/_/g,'/');const bin=atob(b);const u=Uint8Array.from(bin,c=>c.charCodeAt(0));return JSON.parse(new TextDecoder().decode(u))}
+function emptyDb(){const t=today();return{v:1,updatedAt:0,profile:{name:'',baseMode:'transfer',transferDate:'',embryoDay:3,edd:'',lmp:'',fetus:'unknown',blood:'',rh:'',allergy:'',hospital:'',hospitalTel:'',guardian:'',guardianTel:'',birthDate:'',activity:'normal',nausea:false,hideGuide:false,fontLarge:false,theme:'system',trackingStart:t},meds:[],doses:{},days:{},labs:[],appts:[],checks:{},questions:[],kicks:[],contractions:[],lastBackup:''}}
+function buildDb(seed){const d=emptyDb(),t=today();Object.assign(d.profile,seed.profile||{});
+ d.meds=(seed.meds||[]).map(m=>Object.assign({id:uid(),type:'oral',name:'',dose:'',note:'',start:t,end:'',stock:'',stockDate:t},m,{slots:(m.slots||[]).map(s=>Object.assign({id:uid()},s))}));
+ d.labs=(seed.labs||[]).map(x=>Object.assign({id:uid()},x));d.questions=(seed.questions||[]).map(q=>({id:uid(),text:q,done:false,answer:''}));
+ if(seed.seedDay){const sd=seed.seedDay;d.doses[sd]={};for(const m of d.meds)for(const s of m.slots)d.doses[sd][m.id+'|'+s.id]={s:'done',at:'',name:m.name,dose:m.dose,type:m.type,time:s.time,label:s.label||'',site:m.type==='injection'?(seed.seedSite||undefined):undefined}}
+ return d}
+
+/* 시트 */
+function openSheet(html){const el=$('#sheet');el.innerHTML=`<div class="scrim" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div></div>`;sheetOpen=true;pushNav()}
+function closeSheet(pop){$('#sheet').innerHTML='';sheetOpen=false;if(!pop)popNav()}
+const shh=t=>`<div class="shh"><h2>${t}</h2><button class="link" data-a="closeSheet">닫기</button></div>`;
+function pushNav(){if(SIM)return;history.pushState({n:++navDepth},'')}
+function popNav(){if(SIM||navDepth<=0)return;ignorePop=true;navDepth--;history.back()}
+let ignorePop=false;
+function findItem(d,k){return slotsFor(d).find(i=>i.key===k)}
+function doseSheet(d,k){const i=findItem(d,k);if(!i)return;const r=i.rec||{},inj=i.m.type==='injection'&&!i.m.noSite;ui.site=r.site||null;
+ openSheet(`${shh(esc(i.m.name)+' '+esc(i.m.dose||''))}<div class="small muted">${fmtLong(d)} · 예정 ${esc(i.time)}${i.s.label?' · '+esc(i.s.label):''}</div>${i.m.note?`<div class="note info"><span>${esc(i.m.note)}</span></div>`:''}${inj?`<div class="lbl">주사 위치</div><div id="bellyBox">${belly(ui.site,true)}</div>`:''}${fld('dAt','실제 시각','time',r.at||(d===today()?nowHM():i.time))}${fld('dMemo','메모(선택)','text',r.memo||'','placeholder="멍, 불편한 점 등"')}<button class="btn" data-a="doseSave" data-d="${d}" data-k="${esc(k)}">완료로 저장</button><div class="grid2"><button class="btn sec2" data-a="doseSkip" data-d="${d}" data-k="${esc(k)}">건너뜀</button><button class="btn sec2" data-a="doseClear" data-d="${d}" data-k="${esc(k)}">기록 지우기</button></div><div class="small muted">놓친 약을 다음에 두 배로 쓰지 마세요. 어떻게 할지는 병원에 확인하세요.</div>${inj?'<button class="btn ghost" data-a="go" data-v="sites" data-close="1">주사 방법과 위치 기록 보기</button>':''}`)}
+function exSheet(d=today(),id){const x=exToday(d),s=id?EX[id]:x.s,dd=db.days[d]||{},done=dd.ex&&dd.ex.done;
+ openSheet(`${shh(esc(s.t))}<div class="small muted">${s.min?s.min+'분 · ':''}${esc(s.lv)} · ${esc(x.st.t)}</div><ol class="steps">${s.steps.map(t=>`<li>${esc(t)}</li>`).join('')}</ol><div class="note warn"><span>출혈, 배뭉침, 어지러움이 있으면 바로 멈추세요.</span></div>${id?'':s.min?`${fld('exMin','한 시간(분)','number',dd.ex&&dd.ex.min||s.min,'inputmode="numeric"')}<button class="btn" data-a="exDone" data-d="${d}">${done?'완료 취소':'완료로 기록'}</button>`:''}`)}
+function mealSheet(d=today()){const{st,m}=mealDay(d),dd=dayObj(d),md=dd.meal||{};
+ const nausea=db.profile.nausea?`<div class="note info"><b>입덧 모드</b><span>${MEAL_NAUSEA.map(esc).join(' · ')}</span></div>`:'';
+ openSheet(`${shh('오늘 식단')}<div class="small muted">${esc(st.t)} · ${esc(st.focus)}</div>${nausea}<div class="list">${MEAL_LABEL.map(([k,l])=>`<label class="li" style="cursor:pointer"><input type="checkbox" style="width:22px;height:22px;accent-color:var(--acc);flex:none" data-c="meal" data-v="${k}" data-d="${d}" ${md[k]?'checked':''}><span class="grow"><span class="s">${l}</span><br>${esc(m[k])}</span></label>`).join('')}</div><div class="water"><span class="grow"><b>물</b> <span class="small muted">하루 8컵 이상</span></span><button class="icb" data-a="water" data-v="-1" data-d="${d}" aria-label="물 한 컵 빼기" style="background:var(--sf2)">−</button><span class="big-n" id="wN">${dd.water||0}</span><button class="icb" data-a="water" data-v="1" data-d="${d}" aria-label="물 한 컵 더하기" style="background:var(--acc);color:var(--on)">+</button></div><button class="btn sec2" data-a="tabClose" data-v="guide" data-g="meal">전체 식단과 피할 음식</button>`)}
+function bodySheet(d=today()){const dd=db.days[d]||{},s=dd.sym||{};ui.symD=d;ui.sym=Object.assign({},s);
+ openSheet(`${shh(`${fmtMD(d)} 몸 상태`)}<div class="chips">${SYM.map(([k,l,b])=>`<button class="chip ${b?'bad':''} ${s[k]?'on':''}" data-a="sym" data-v="${k}" aria-pressed="${!!s[k]}">${l}</button>`).join('')}</div><div id="symNote"></div><div class="grid2">${fld('bW','체중(kg)','number',dd.weight,'inputmode="decimal" step="0.1"')}${fld('bP','혈압(수축/이완)','text',dd.bp,'placeholder="118/76" inputmode="numeric"')}</div><div class="fld"><label for="bN">메모</label><textarea id="bN" rows="2">${esc(dd.note||'')}</textarea></div><button class="btn" data-a="bodySave">저장</button>`);symNote()}
+function symNote(){const b=SYM.filter(s=>s[2]&&ui.sym[s[0]]).length,el=$('#symNote');if(el)el.innerHTML=b?`<div class="note bad"><b>담당 병원에 바로 연락하세요</b><span>기록보다 연락이 먼저입니다. 응급하면 119에 전화하세요.</span></div>`:''}
+function labSheet(id){const x=id?db.labs.find(l=>l.id===id):{date:today(),name:'hCG',value:'',unit:'mIU/mL',note:''};
+ openSheet(`${shh(id?'수치 수정':'수치 추가')}${fld('lD','검사일','date',x.date)}<div class="fld"><label for="lN">항목</label><input id="lN" type="text" list="labNames" value="${esc(x.name)}"><datalist id="labNames"><option>hCG</option><option>프로게스테론</option><option>에스트라디올</option><option>혈색소</option><option>공복혈당</option><option>TSH</option></datalist></div><div class="grid2">${fld('lV','수치','text',x.value,'inputmode="decimal"')}${fld('lU','단위','text',x.unit)}</div>${fld('lM','메모','text',x.note)}<button class="btn" data-a="labSave" data-id="${id||''}">저장</button>${id?`<button class="btn sec2" data-a="labDel" data-id="${id}">삭제</button>`:''}`)}
+function apptSheet(id,d){const x=id?db.appts.find(a=>a.id===id):{date:d||today(),time:'',kind:'visit',title:'',note:''};
+ openSheet(`${shh(id?'일정 수정':'일정 추가')}${sel('aK','종류',x.kind,[['visit','내원'],['procedure','시술·검사']])}${fld('aT','내용','text',x.title,'placeholder="첫 초음파"')}<div class="grid2">${fld('aD','날짜','date',x.date)}${fld('aH','시간','time',x.time)}</div>${fld('aN','메모','text',x.note)}<button class="btn" data-a="apptSave" data-id="${id||''}">저장</button>${id?`<button class="btn sec2" data-a="apptDel" data-id="${id}">삭제</button>`:''}`)}
+function medSheet(id){const m=id?db.meds.find(x=>x.id===id):{type:'oral',name:'',dose:'',note:'',slots:[{id:uid(),label:'',time:'08:00'}],gap:null,stock:'',start:today(),end:''};ui.ms=JSON.parse(JSON.stringify(m.slots));
+ openSheet(`${shh(id?'처방 수정':'처방 추가')}${sel('mT','종류',m.type,Object.entries(TYPE))}${fld('mN','이름','text',m.name)}${fld('mD','용량','text',m.dose,'placeholder="예: 100mg, 1개"')}<div class="sec"><div class="lbl">하루 시간</div><div id="mSlots">${medSlots()}</div><button class="btn sec2" data-a="slotAdd">시간 추가</button></div><div class="grid2">${fld('mG0','간격 최소(시간)','number',m.gap?m.gap[0]:'')}${fld('mG1','간격 최대(시간)','number',m.gap?m.gap[1]:'')}</div>${fld('mNo','복용 안내','text',m.note)}${fld('mS','남은 수량(회분, 선택)','number',id?(remaining(m)==null?'':remaining(m)):'')}${fld('mE','마지막 날(선택)','date',m.end)}<button class="btn" data-a="medSave" data-id="${id||''}">저장</button>${id?`<button class="btn sec2" data-a="medEnd" data-id="${id}">오늘까지만 사용</button>`:''}<div class="small muted">처방 변경과 중단은 병원 지시를 따르세요.</div>`)}
+const medSlots=()=>ui.ms.map((s,i)=>`<div class="row" style="margin-bottom:6px"><input type="text" aria-label="시간 이름" placeholder="아침" value="${esc(s.label||'')}" data-c="slotL" data-v="${i}" style="flex:1;min-width:0"><input type="time" aria-label="시간" value="${esc(s.time)}" data-c="slotT" data-v="${i}" style="flex:1;min-width:0"><button class="link" data-a="slotDel" data-v="${i}" aria-label="시간 삭제">삭제</button></div>`).join('');
+function askSheet(title,msg,act,label){openSheet(`${shh(title)}<p>${msg}</p><button class="btn danger" data-a="${act}">${label}</button><button class="btn sec2" data-a="closeSheet">취소</button>`)}
+
+/* 알림 */
+let toastT;function toast(msg,undo){const old=$('.toast');if(old)old.remove();const el=document.createElement('div');el.className='toast';el.setAttribute('role','status');el.innerHTML=`<span>${esc(msg)}</span>${undo?'<button data-a="undo">되돌리기</button>':''}`;document.body.appendChild(el);ui.undo=undo;clearTimeout(toastT);toastT=setTimeout(()=>el.remove(),undo?5200:3200)}
+async function copyText(t,el){try{await navigator.clipboard.writeText(t);toast('복사했습니다')}catch(e){if(el){el.hidden=false;el.value=t;el.select();toast('선택된 내용을 길게 눌러 복사하세요')}else toast('복사하지 못했습니다')}}
+
+/* 동작 */
+const ACT={
+ tab(d){view=d.v;stack=[];if(d.v==='guide'&&d.g)ui.guide=d.g;render();scrollTo(0,0)},
+ tabClose(d){closeSheet();ACT.tab(d)},
+ go(d,el){if(el.dataset.close)closeSheet();stack.push(d.v);pushNav();render();scrollTo(0,0)},
+ back(){stack.pop();popNav();render();scrollTo(0,0)},
+ closeSheet(){closeSheet()},
+ scrim(d,el,e){if(e.target===el)closeSheet()},
+ undo(){if(ui.undo){ui.undo();ui.undo=null;const t=$('.toast');if(t)t.remove()}},
+ tick(d){const i=findItem(d.d,d.k);if(!i)return;if(i.rec){const prev=JSON.parse(JSON.stringify(i.rec));clearDose(d.d,d.k);save();render();toast('기록을 지웠습니다',()=>{db.doses[d.d]=db.doses[d.d]||{};db.doses[d.d][d.k]=prev;save();render()});return}
+  if(i.m.type==='injection'&&!i.m.noSite){doseSheet(d.d,d.k);return}
+  const at=d.d===today()?nowHM():i.time;record(d.d,i,{at});save();render();const g=gapMsg(d.d,i,at);toast(g||`${i.m.name} ${at} 완료`,()=>{clearDose(d.d,d.k);save();render()})},
+ dose(d){doseSheet(d.d,d.k)},
+ zone(d){ui.site=d.v;$('#bellyBox').innerHTML=belly(ui.site,true)},
+ doseSave(d){const i=findItem(d.d,d.k);if(!i)return;const inj=i.m.type==='injection'&&!i.m.noSite;if(inj&&!ui.site){toast('주사 위치를 선택해 주세요');return}
+  const at=$('#dAt').value,memo=$('#dMemo').value.trim();const o={s:'done',at,memo};if(inj)o.site=ui.site;record(d.d,i,o);save();closeSheet();render();const g=gapMsg(d.d,i,at);toast(g||`${i.m.name} 기록했습니다`)},
+ doseSkip(d){const i=findItem(d.d,d.k);if(!i)return;record(d.d,i,{s:'skip',at:'',memo:$('#dMemo').value.trim()});save();closeSheet();render();toast('건너뜀으로 기록했습니다')},
+ doseClear(d){clearDose(d.d,d.k);save();closeSheet();render()},
+ exSheet(){exSheet()},
+ exView(d){exSheet(today(),d.v)},
+ exDone(d){const o=dayObj(d.d),x=exToday(d.d);if(o.ex&&o.ex.done)delete o.ex;else o.ex={done:true,t:x.s.t,min:$('#exMin').value};save();closeSheet();render()},
+ mealSheet(){mealSheet()},
+ water(d,el){const o=dayObj(d.d);o.water=Math.max(0,(o.water||0)+Number(d.v));$('#wN').textContent=o.water;save()},
+ bodySheet(d){bodySheet(d.d||today())},
+ sym(d,el){ui.sym[d.v]=!ui.sym[d.v];el.classList.toggle('on',ui.sym[d.v]);el.setAttribute('aria-pressed',ui.sym[d.v]);symNote()},
+ bodySave(){const o=dayObj(ui.symD),w=$('#bW').value.trim(),b=$('#bP').value.trim();if(b&&!/^\d{2,3}\/\d{2,3}$/.test(b)){toast('혈압은 118/76처럼 입력해 주세요');return}o.sym=ui.sym;o.weight=w;o.bp=b;o.note=$('#bN').value.trim();save();closeSheet();render()},
+ pick(d){ui.sel=d.v;render()},
+ mon(d){const[y,m]=ui.month.split('-').map(Number),x=new Date(y,m-1+Number(d.v),1,12);ui.month=toStr(x).slice(0,7);render()},
+ gTab(d){ui.guide=d.v;render()},
+ gw(d){ui.gw=clampW(ui.gw+Number(d.v));render()},
+ lTab(d){ui.log=d.v;render()},
+ labSheet(d){labSheet(d.id)},
+ labSave(d){const v=$('#lV').value.trim(),n=$('#lN').value.trim(),dt=$('#lD').value;if(!v||!n||!dt){toast('검사일, 항목, 수치를 입력해 주세요');return}const o={date:dt,name:n,value:v,unit:$('#lU').value.trim(),note:$('#lM').value.trim()};if(d.id)Object.assign(db.labs.find(l=>l.id===d.id),o);else db.labs.push(Object.assign({id:uid()},o));save();closeSheet();render()},
+ labDel(d){db.labs=db.labs.filter(l=>l.id!==d.id);save();closeSheet();render()},
+ apptSheet(d){apptSheet(d.id,d.d)},
+ apptSave(d){const t=$('#aT').value.trim(),dt=$('#aD').value;if(!t||!dt){toast('내용과 날짜를 입력해 주세요');return}const o={date:dt,time:$('#aH').value,kind:$('#aK').value,title:t,note:$('#aN').value.trim()};if(d.id)Object.assign(db.appts.find(a=>a.id===d.id),o);else db.appts.push(Object.assign({id:uid()},o));save();closeSheet();render()},
+ apptDel(d){db.appts=db.appts.filter(a=>a.id!==d.id);save();closeSheet();render()},
+ qAdd(){const e=$('#qText'),t=e.value.trim();if(!t)return;db.questions.push({id:uid(),text:t,done:false,answer:''});save();render()},
+ qDel(d){db.questions=db.questions.filter(q=>q.id!==d.v);save();render()},
+ kick(){if(!ui.kick)ui.kick={start:Date.now(),count:0};else ui.kick.count++;if(ui.kick.count>=10)ACT.kickEnd();else render()},
+ kickEnd(){const k=ui.kick;if(!k)return;db.kicks.push({date:today(),count:k.count,min:Math.max(1,Math.round((Date.now()-k.start)/6e4))});ui.kick=null;save();render();toast('태동 기록을 저장했습니다')},
+ cont(){if(ui.cont){db.contractions.push({start:ui.cont,end:new Date().toISOString()});ui.cont=null;save()}else ui.cont=new Date().toISOString();render()},
+ contClear(){db.contractions=[];save();render()},
+ medSheet(d){medSheet(d.id)},
+ slotAdd(){ui.ms.push({id:uid(),label:'',time:'20:00'});$('#mSlots').innerHTML=medSlots()},
+ slotDel(d){ui.ms.splice(Number(d.v),1);$('#mSlots').innerHTML=medSlots()},
+ medSave(d){const name=$('#mN').value.trim();if(!name){toast('이름을 입력해 주세요');return}if(!ui.ms.length){toast('시간을 하나 이상 넣어 주세요');return}const t=today(),g0=$('#mG0').value,g1=$('#mG1').value,st=$('#mS').value,o={type:$('#mT').value,name,dose:$('#mD').value.trim(),note:$('#mNo').value.trim(),slots:ui.ms,gap:g0&&g1?[Number(g0),Number(g1)]:null,end:$('#mE').value,stock:st===''?'':Number(st),stockDate:t};
+  if(d.id){const m=db.meds.find(x=>x.id===d.id),changed=['name','dose','type'].some(k=>m[k]!==o[k])||JSON.stringify(m.slots.map(s=>s.time))!==JSON.stringify(o.slots.map(s=>s.time));const past=Object.keys(db.doses).some(dt=>dt<t&&Object.keys(db.doses[dt]).some(k=>k.startsWith(m.id+'|')));
+   if(changed&&(past||m.start<t)){const nid=uid(),nm=Object.assign({},m,o,{id:nid,start:t});m.end=add(t,-1);const r=db.doses[t]||{};for(const k of Object.keys(r))if(k.startsWith(m.id+'|')){const nk=nid+'|'+k.split('|')[1];if(o.slots.some(s=>s.id===k.split('|')[1])){r[nk]=r[k];delete r[k]}}db.meds.push(nm)}else Object.assign(m,o)}
+  else db.meds.push(Object.assign({id:uid(),start:t},o));save();closeSheet();render();toast('처방을 저장했습니다')},
+ medEnd(d){const m=db.meds.find(x=>x.id===d.id);m.end=today();save();closeSheet();render();toast('오늘까지 사용으로 저장했습니다')},
+ copy(d){copyText($('#'+d.v).value,$('#'+d.v))},
+ async exportFile(){const data=JSON.stringify(db),name=`poom-backup-${today()}.json`,f=new File([data],name,{type:'application/json'});try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'품 백업'})}else{const u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000)}db.lastBackup=today();await save();render();toast('백업 파일을 만들었습니다')}catch(e){if(e&&e.name!=='AbortError')toast('파일을 만들지 못했습니다. 백업 내용 복사를 이용하세요.')}},
+ exportCopy(){db.lastBackup=today();save();copyText(JSON.stringify(db),$('#bkOut'))},
+ async restoreAsk(){let t=$('#bkText').value.trim();const f=$('#bkFile').files[0];if(f)t=await f.text();if(!t){toast('백업 파일을 고르거나 내용을 붙여넣어 주세요');return}try{const o=JSON.parse(t);if(!o||!o.profile||!Array.isArray(o.meds)||!o.doses)throw 0;ui.pending=o;askSheet('복원할까요?',`${o.updatedAt?new Date(o.updatedAt).toLocaleDateString('ko-KR')+' 기록으로 ':''}지금 폰의 기록을 바꿉니다.`,'restoreGo','복원')}catch(e){toast('백업 형식이 맞지 않습니다. 파일을 다시 확인해 주세요.')}},
+ async restoreGo(){db=Object.assign(emptyDb(),ui.pending);await save();closeSheet();stack=[];view='today';render();toast('복원했습니다')},
+ saveSettings(){const p=db.profile,v=id=>{const e=$('#'+id);return e?e.value:undefined},set=(k,id)=>{const x=v(id);if(x!==undefined)p[k]=x};set('name','sName');const nb=v('sBase');set('transferDate','sTrans');set('embryoDay','sEmb');set('edd','sEdd');set('lmp','sLmp');set('fetus','sFetus');set('birthDate','sBirth');set('blood','sBlood');set('rh','sRh');set('allergy','sAllergy');set('hospital','sHosp');set('hospitalTel','sHospT');set('guardian','sGuard');set('guardianTel','sGuardT');set('activity','sAct');set('theme','sTheme');p.nausea=$('#sNausea').checked;p.hideGuide=$('#sHide').checked;p.fontLarge=$('#sLarge').checked;p.baseMode=nb;ui.gw=null;applyPrefs();save();render();toast('저장했습니다')},
+ wipeAsk(){askSheet('모든 기록을 지울까요?','약 기록, 달력, 수치, 설정이 이 폰에서 모두 사라집니다. 먼저 백업하세요. 되돌릴 수 없습니다.','wipeGo','모두 지우기')},
+ async wipeGo(){await Store.clear();db=null;closeSheet();stack=[];view='today';ui.setup={step:'start'};if(SIM){await simReset();return}render()},
+ async codeGo(){const t=$('#code').value;if(!t.trim()){toast('설정 코드를 붙여넣어 주세요');return}try{ui.setup={step:'confirm',seed:decodeSetup(t)};render();scrollTo(0,0)}catch(e){toast('설정 코드를 읽지 못했습니다. 끊기지 않게 전체를 붙여넣어 주세요.')}},
+ manualGo(){ui.setup={step:'confirm',seed:{profile:{name:'',baseMode:'transfer',transferDate:'',embryoDay:3},meds:[]}};render()},
+ helpFirst(){ui.setup={step:'help'};render();scrollTo(0,0)},
+ setupBack(){ui.setup={step:'start'};render()},
+ async setupDone(){const s=ui.setup.seed;s.profile.name=$('#fName').value.trim();s.profile.transferDate=$('#fTrans').value;s.profile.embryoDay=Number($('#fEmb').value);db=buildDb(s);await save();try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}applyPrefs();view='today';render();scrollTo(0,0);toast('시작했습니다')},
+ async pwaInstall(){const p=window.__bip;if(p){p.prompt();await p.userChoice;window.__bip=null;render()}}
+};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el)return;const a=ACT[el.dataset.a];if(a){if(el.dataset.a==='scrim'&&e.target!==el)return;a(el.dataset,el,e)}});
+document.addEventListener('change',e=>{const c=e.target.dataset&&e.target.dataset.c;if(!c)return;const v=e.target.dataset.v;
+ if(c==='ms'){db.checks[v]=e.target.checked;save()}
+ if(c==='sup'){db.checks['sup'+v]=e.target.checked;save()}
+ if(c==='meal'){const o=dayObj(e.target.dataset.d);o.meal=o.meal||{};o.meal[v]=e.target.checked;save();render()}
+ if(c==='qDone'){const q=db.questions.find(x=>x.id===v);q.done=e.target.checked;save();render()}
+ if(c==='slotL')ui.ms[Number(v)].label=e.target.value;
+ if(c==='slotT')ui.ms[Number(v)].time=e.target.value;
+ if(c==='seedTime')ui.setup.seed.meds[Number(e.target.dataset.m)].slots[Number(e.target.dataset.s)].time=e.target.value;
+ if(e.target.id==='sBase'){db.profile.baseMode=e.target.value;render()}});
+window.addEventListener('popstate',()=>{if(ignorePop){ignorePop=false;return}if(navDepth>0)navDepth--;if(sheetOpen){closeSheet(true);return}if(stack.length){stack.pop();render()}});
+
+/* 화면 */
+function applyPrefs(){if(!db)return;const p=db.profile;document.body.classList.toggle('large',!!p.fontLarge);if(!SIM){if(p.theme==='system')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',p.theme)}}
+function render(){const root=$('#root'),nav=$('#nav');lastDay=today();
+ if(window.__simBar)window.__simBar();
+ if(!db){root.innerHTML=vSetup();nav.innerHTML='';return}
+ const sub=stack[stack.length-1];const V={emergency:vEmergency,meds:vMeds,sites:vSites,alarm:vAlarm,summary:vSummary,support:vSupport,backup:vBackup,settings:vSettings,help:vHelp,sources:vSources};
+ const views={today:vToday,cal:vCal,guide:vGuide,log:vLog,more:vMore};
+ if(db.profile.hideGuide&&view==='guide')view='today';
+ root.innerHTML=(sub?V[sub]:views[view])();
+ const tabs=[['today','오늘',I.today],['cal','달력',I.cal],['guide','주차',I.guide],['log','기록',I.log],['more','더보기',I.more]].filter(t=>!(db.profile.hideGuide&&t[0]==='guide'));
+ nav.innerHTML=`<div>${tabs.map(([k,l,i])=>`<button class="${view===k?'on':''}" data-a="tab" data-v="${k}" ${view===k?'aria-current="page"':''}>${i}${l}</button>`).join('')}</div>`}
+setInterval(()=>{if(db&&!sheetOpen&&!document.activeElement.matches('input,textarea,select')&&view==='today'&&!stack.length)render()},60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&db&&!sheetOpen&&lastDay!==today()){ui.sel=null;ui.month=null;ui.gw=null;render()}});
+async function boot(){if(SIM){await window.__simBoot();return}
+ db=await Store.get();if(db){db=Object.assign(emptyDb(),db);applyPrefs()}render();
+ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window.__bip=e;if(!db)render()});
+ if('serviceWorker'in navigator){try{const r=await navigator.serviceWorker.register('./sw.js');r.addEventListener('updatefound',()=>{const n=r.installing;if(n)n.addEventListener('statechange',()=>{if(n.state==='installed'&&navigator.serviceWorker.controller)toast('새 버전이 준비되었습니다. 앱을 다시 열면 적용됩니다.')})})}catch(e){}}
+ try{if(db&&navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}}
+setTimeout(boot,0);
