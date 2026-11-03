@@ -186,3 +186,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .cell{color:var(--ink)}
 .list a.li{text-decoration:none;color:var(--ink)}
 button.note{width:100%}
+.calstep{display:flex;align-items:center;gap:8px;font-size:1rem;font-weight:700}
+.calstep span{width:24px;height:24px;border-radius:50%;background:var(--acc);color:var(--on);display:grid;place-items:center;font-size:.8rem;flex:none}
+.sheet ol{display:flex;flex-direction:column;gap:2px}
+a.btn{text-decoration:none}
+[hidden]{display:none!important}
