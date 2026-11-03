@@ -18,7 +18,8 @@ const fmtYMD=s=>{const d=parse(s);return `${d.getFullYear()}.${d.getMonth()+1}.$
 const TYPE={injection:'주사',oral:'경구약',vaginal:'질정',supp:'영양제',other:'기타'};
 const ZONES={LU:'왼쪽 위',LM:'왼쪽 가운데',LL:'왼쪽 아래',RU:'오른쪽 위',RM:'오른쪽 가운데',RL:'오른쪽 아래',L:'왼쪽',R:'오른쪽'};
 const SYM=[['bleedS','소량 출혈'],['bleedL','출혈 많음',1],['pain','아랫배 통증'],['painOne','한쪽 심한 복통',1],['shoulder','어깨끝 통증',1],['dizzy','심한 어지러움',1],['nausea','입덧'],['vomit','구토'],['constip','변비'],['tired','피로'],['headache','두통'],['swell','붓기'],['bruise','주사 부위 멍'],['tight','배뭉침'],['sleep','잠 설침'],['anxious','불안']];
-let db=null,view='today',stack=[],navDepth=0,lastDay='',sheetOpen=false;
+let photos=[];
+let db=null,view='today',stack=[],lastDay='',sheetOpen=false;
 const ui={guide:'week',gw:null,log:'lab',month:null,sel:null,setup:{step:'start'},site:null,kick:null,cont:null,code:''};
 
 /* 저장 */
@@ -32,7 +33,12 @@ const Store={
   try{localStorage.setItem(KEY,JSON.stringify(v));okAny=true}catch(e){}
   try{const d=await this.idb();await new Promise((ok,no)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,'db');t.oncomplete=ok;t.onerror=()=>no(t.error)});okAny=true}catch(e){}
   return okAny},
- async clear(){try{localStorage.removeItem(KEY)}catch(e){}try{const d=await this.idb();await new Promise(ok=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').delete('db');t.oncomplete=ok;t.onerror=ok})}catch(e){}}
+ pdb(){return new Promise((ok,no)=>{try{const r=indexedDB.open(NS+'-photos',1);r.onupgradeneeded=()=>r.result.createObjectStore('photos',{keyPath:'id'});r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}catch(e){no(e)}})},
+ async photoAll(){try{const d=await this.pdb();return await new Promise(ok=>{const q=d.transaction('photos').objectStore('photos').getAll();q.onsuccess=()=>ok(q.result||[]);q.onerror=()=>ok([])})}catch(e){return[]}},
+ async photoPut(p){const d=await this.pdb();await new Promise((ok,no)=>{const t=d.transaction('photos','readwrite');t.objectStore('photos').put(p);t.oncomplete=ok;t.onerror=()=>no(t.error);t.onabort=()=>no(t.error)})},
+ async photoDel(id){const d=await this.pdb();await new Promise(ok=>{const t=d.transaction('photos','readwrite');t.objectStore('photos').delete(id);t.oncomplete=ok;t.onerror=ok})},
+ async photoClear(){try{const d=await this.pdb();await new Promise(ok=>{const t=d.transaction('photos','readwrite');t.objectStore('photos').clear();t.oncomplete=ok;t.onerror=ok})}catch(e){}},
+ async clear(){await this.photoClear();try{localStorage.removeItem(KEY)}catch(e){}try{const d=await this.idb();await new Promise(ok=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').delete('db');t.oncomplete=ok;t.onerror=ok})}catch(e){}}
 };
 async function save(){db.updatedAt=Date.now();const ok=await Store.put(db);if(!ok)toast('저장하지 못했습니다. 저장 공간을 확인하고 백업해 주세요.')}
 
@@ -116,8 +122,9 @@ function doseList(date){const items=slotsFor(date);if(!items.length)return `<div
  let h='<div class="list">',cur=null;for(const i of items){if(i.time!==cur){cur=i.time;h+=`<div class="timeh">${esc(cur||'시각 없음')}${i.s.label?` · ${esc(i.s.label)}`:''}</div>`}h+=doseRow(date,i)}return h+'</div>'}
 
 /* 오늘 */
+function dedication(){const n=(db.profile.name||'').trim();if(!n)return'';const g=/^[가-힣]{3}$/.test(n)?n.slice(1):n,c=g.charCodeAt(g.length-1),j=c>=0xAC00&&c<=0xD7A3&&(c-0xAC00)%28>0;return `사랑하는 ${esc(g)}${j?'을':'를'} 위해 남편이 만들었습니다.`}
 function vToday(){const p=db.profile,t=today(),hide=p.hideGuide,g=ga(t),st=dayStat(t),notes=[];
- let hero=`<div class="hero"><div class="date">${fmtLong(t)}${p.name?` · ${esc(p.name)}님`:''}</div>`;
+ let hero=`<div class="hero"><div class="date">${fmtLong(t)}${p.name?` · ${esc(p.name)}님`:''}</div>${dedication()?`<div class="ded">${dedication()}</div>`:''}`;
  if(!hide&&g!=null){if(born()){hero+=`<div class="ga">산후 ${diff(t,p.birthDate)}<small>일</small></div>`}else{const dday=diff(edd(),t);
   hero+=`<div class="ga">${Math.floor(g/7)}<small>주</small> ${g%7}<small>일</small></div><div class="herosub">출산 예정일 ${fmtYMD(edd())} · ${dday>=0?'D-'+dday:'D+'+(-dday)}${p.fetus&&p.fetus!=='unknown'?` · 아기 ${esc(p.fetus)}명`:''}</div><div class="track" aria-hidden="true"><i></i><b style="width:${Math.min(100,g/280*100).toFixed(1)}%"></b><u style="left:${(14*7/280*100).toFixed(1)}%"></u><u style="left:${(28*7/280*100).toFixed(1)}%"></u></div><div class="tracklab"><span>초기</span><span>중기 14주</span><span>후기 28주</span><span>40주</span></div>`}}
  hero+='</div>';
@@ -157,6 +164,7 @@ function vCal(){const t=today();ui.sel=ui.sel||t;ui.month=ui.month||t.slice(0,7)
  const s=ui.sel,dd=db.days[s]||{},syms=SYM.filter(x=>(dd.sym||{})[x[0]]).map(x=>x[1]),ap=db.appts.filter(a=>a.date===s),labs=db.labs.filter(x=>x.date===s),g=ga(s);
  let d=`<section class="sec"><div class="sech"><h2>${fmtLong(s)}</h2><span class="small muted num">${g!=null&&g>=0&&!db.profile.hideGuide?fmtGA(g):''}</span></div>${s<=t?doseList(s):upcomingNote(s)}`;
  if(ap.length)d+=`<div class="list">${ap.map(apptRow).join('')}</div>`;
+ const dph=db.profile.hideGuide?[]:photos.filter(p=>p.date===s);if(dph.length)d+=`<div class="phs">${dph.map(thumb).join('')}</div>`;
  const info=[];if(syms.length)info.push(['몸 상태',esc(syms.join(', '))]);if(dd.weight)info.push(['체중',esc(dd.weight)+'kg']);if(dd.bp)info.push(['혈압',esc(dd.bp)]);if(dd.ex&&dd.ex.done)info.push(['운동',esc(dd.ex.t||'완료')+(dd.ex.min?` ${esc(dd.ex.min)}분`:'')]);if(dd.note)info.push(['메모',esc(dd.note)]);if(dd.water)info.push(['물',esc(dd.water)+'컵']);
  for(const x of labs)info.push([esc(x.name),esc(x.value)+' '+esc(x.unit||'')]);
  if(info.length)d+=`<div class="list">${info.map(([a,b])=>`<div class="li"><span class="small muted" style="width:62px;flex:none">${a}</span><span class="grow">${b}</span></div>`).join('')}</div>`;
@@ -170,8 +178,9 @@ function vGuide(){const t=today();ui.gw=ui.gw||clampW(wk(t));if(!lmp())return `<
  const tab=ui.guide;let b='';
  if(tab==='week'){const w=ui.gw,x=WEEKS[w],l=lmp(),a=add(l,w*7),e=add(a,6),mn=MULTI_NOTES.find(n=>w>=n[0]&&w<=n[1]);
   b=`<div class="weekbar"><button class="icb" data-a="gw" data-v="-1" aria-label="이전 주">${I.back}</button><div class="grow" style="text-align:center"><div class="w">${w}주${w===wk(t)?' <span class="small muted">이번 주</span>':''}</div><div class="small muted num">${fmtMD(a)}~${fmtMD(e)}</div></div><button class="icb" data-a="gw" data-v="1" aria-label="다음 주">${I.next}</button></div>
-  <h2 style="font:700 1.25rem/1.3 var(--d)">${esc(x.head)}</h2><div class="small muted">아기 크기 ${esc(x.baby)} (대략)</div><div class="prose">${lst('c','확인할 일',x.check)}${lst('g','고려할 점',x.consider)}${lst('w','주의할 점',x.caution)}</div>`;
+  <h2 style="font:700 1.25rem/1.3 var(--d)">${esc(x.head)}</h2><div class="artrow">${artSvg(w)}<div class="grow"><div class="small muted">아기 크기(대략)</div><div class="t">${esc(x.baby)}</div><div class="small muted">${esc((ART_STAGES.find(k=>w<=k.to)||ART_STAGES[7]).cap)}</div></div></div>${sizeScale(w)}<div class="small faint">그림은 이해를 돕는 단순한 표현이며 실제 모습과 다릅니다. 길이는 19주까지 머리부터 엉덩이, 20주부터 머리부터 발까지입니다.</div><div class="prose">${lst('c','확인할 일',x.check)}${lst('g','고려할 점',x.consider)}${lst('w','주의할 점',x.caution)}</div>`;
   if(mn&&Number(db.profile.fetus)!==1)b+=`<div class="note info"><b>다태 임신이라면</b><span>${esc(mn[2])}</span></div>`;
+  b+=photoSection(w);
   b+=`<div class="small faint">주수는 입력한 기준으로 계산합니다. 병원 안내가 다르면 병원을 따르세요.</div>`}
  if(tab==='sched'){b=`<div class="list">`+MILESTONES.filter(msVisible).map(m=>{const[a,e]=msRange(m);const pass=e<t&&!db.checks[m.id];return `<label class="li" style="cursor:pointer"><input type="checkbox" style="width:22px;height:22px;accent-color:var(--acc);flex:none" data-c="ms" data-v="${m.id}" ${db.checks[m.id]?'checked':''}><span class="grow"><span class="t">${esc(m.title)}</span> <span class="tag t-other">${esc(m.tag)}</span><br><span class="s num">${a===e?fmtYMD(a):`${fmtMD(a)}~${fmtMD(e)}`}${m.note?' · '+esc(m.note):''}${pass?' · 지난 일정':''}</span></span></label>`}).join('')+`</div><div class="small faint">날짜는 예상 범위입니다. 실제 날짜는 병원 안내를 달력에 입력하세요.</div>`}
  if(tab==='ex'){const st=exStage(t),idx=(parse(t).getDay()+6)%7,names=['월','화','수','목','금','토','일'];
@@ -184,6 +193,16 @@ function vGuide(){const t=today();ui.gw=ui.gw||clampW(wk(t));if(!lmp())return `<
   b+=st.days.map((dm,i)=>`<details ${i===idx?'open':''}><summary>${names[i]}요일${i===idx?' · 오늘':''}</summary><div>${MEAL_LABEL.map(([k,l])=>`<div><span class="small muted">${l}</span><br>${esc(dm[k])}</div>`).join('')}</div></details>`).join('');
   b+=`<div class="prose">${lst('w','피할 음식',FOOD_RULES.avoid)}${lst('g','양을 지킬 음식',FOOD_RULES.limit)}${lst('c','먼저 확인할 것',FOOD_RULES.check)}</div><div class="sec"><h2 style="font-size:1rem">임신부 하루 영양 기준</h2><div class="list">${NUTRITION.map(([a,c])=>`<div class="li" style="min-height:42px"><span class="small muted" style="width:82px;flex:none">${a}</span><span class="grow small">${c}</span></div>`).join('')}</div><div class="small faint">2025 한국인 영양소 섭취기준의 임신부 부가량입니다. ${esc(WEIGHT_GOAL)}</div></div>`}
  return `<div class="stack"><div class="ptitle">주차 안내</div>${seg('gTab',tab,[['week','주차별'],['sched','일정'],['ex','운동'],['meal','식단']])}${b}</div>`}
+
+/* 초음파 사진 */
+const weekOf=d=>{const g=ga(d);return g==null?null:Math.floor(g/7)};
+const thumb=p=>`<button class="ph" data-a="photoView" data-id="${esc(p.id)}" aria-label="${fmtYMD(p.date)} 사진 보기"><img src="${esc(p.thumb)}" alt=""></button>`;
+const photoInput=id=>`<label class="btn sec2" for="${id}">초음파 사진 넣기</label><input class="vh" id="${id}" type="file" accept="image/*" data-c="photo">`;
+function photoSection(w){const list=photos.filter(p=>weekOf(p.date)===w).sort((a,b)=>a.date.localeCompare(b.date));return `<section class="sec"><div class="sech"><h2>우리 아기 사진</h2>${photos.length?'<button class="link" data-a="go" data-v="album">앨범 보기</button>':''}</div>${list.length?`<div class="phs">${list.map(thumb).join('')}</div>`:'<div class="small muted">이번 주 초음파 사진을 넣어두면 주차별로 모입니다. 사진은 이 폰에만 저장됩니다.</div>'}${photoInput('photoIn')}</section>`}
+function vAlbum(){const by={};for(const p of photos)(by[weekOf(p.date)]=by[weekOf(p.date)]||[]).push(p);const ks=Object.keys(by).map(Number).sort((a,b)=>b-a);return `<div class="stack">${head('초음파 앨범')}${photoInput('photoIn2')}${ks.length?ks.map(k=>`<section class="sec"><h2 style="font-size:1rem">${isNaN(k)?'날짜 기준 없음':k+'주'}</h2><div class="phs">${by[k].sort((a,b)=>a.date.localeCompare(b.date)).map(thumb).join('')}</div></section>`).join(''):'<div class="note info"><span>병원에서 받은 초음파 사진을 넣으면 주차별로 모아 볼 수 있습니다.</span></div>'}<div class="small faint">사진은 이 폰에만 저장됩니다. 사진까지 보관하려면 더보기의 백업 파일을 만들어 주세요.</div></div>`}
+async function shrink(url,max,q){const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=url});const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*k));c.height=Math.max(1,Math.round(img.height*k));c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',q)}
+async function pickPhoto(file){try{const url=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(file)});const data=await shrink(url,1400,.82),th=await shrink(url,300,.7);ui.ph={data,thumb:th};const t=today(),d=view==='guide'&&!stack.length&&ui.gw&&ui.gw!==wk(t)&&lmp()?add(lmp(),ui.gw*7):t;openSheet(`${shh('사진 저장')}<img class="phbig" src="${esc(data)}" alt="선택한 사진 미리보기">${fld('pD','촬영일','date',d)}${fld('pM','메모(선택)','text','','placeholder="아기집 확인, 심장박동 등"')}<button class="btn" data-a="photoSave">저장</button>`)}catch(e){toast('사진을 읽지 못했습니다. 다른 사진으로 다시 시도해 주세요.')}}
+function photoView(id){const p=photos.find(x=>x.id===id);if(!p)return;const g=ga(p.date);openSheet(`${shh(fmtYMD(p.date)+(g!=null&&g>=0?' · '+fmtGA(g):''))}<img class="phbig" src="${esc(p.data)}" alt="초음파 사진">${p.memo?`<p>${esc(p.memo)}</p>`:''}<button class="btn sec2" data-a="photoDelAsk" data-id="${esc(p.id)}">사진 지우기</button>`)}
 
 /* 기록 */
 function vLog(){const t=ui.log;let b='';
@@ -213,7 +232,7 @@ function chart(pts,o){const W=340,H=170,L=46,R=14,T=16,B=26,xs=pts.map(p=>parse(
  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="수치 변화 그래프">${g}<polyline class="ln" points="${line}"/>${dots}${labs}</svg>`}
 
 /* 더보기 */
-function vMore(){const m=[['emergency','응급 카드','현재 약, 마지막 주사, 연락처'],['meds','처방 관리','약과 주사 추가, 변경, 중단'],['sites','주사 위치 기록','부위별 기록과 주사 방법'],['alarm','알람 맞추기','캘린더 알림 만들기, 시계 알람 시간표'],['summary','진료 요약','최근 기록을 복사해 보여주기'],['support','지원 제도','신청할 것 확인'],['backup','백업과 복원','기록 내보내기, 폰 교체'],['settings','설정','이름, 임신 기준, 화면'],['help','도움말','처음 쓰는 방법'],['sources','참고 자료','안내의 근거']];
+function vMore(){const m=[['emergency','응급 카드','현재 약, 마지막 주사, 연락처'],...(db.profile.hideGuide?[]:[['album','초음파 앨범','주차별 사진 모아보기']]),['meds','처방 관리','약과 주사 추가, 변경, 중단'],['sites','주사 위치 기록','부위별 기록과 주사 방법'],['alarm','알람 맞추기','캘린더 알림 만들기, 시계 알람 시간표'],['summary','진료 요약','최근 기록을 복사해 보여주기'],['support','지원 제도','신청할 것 확인'],['backup','백업과 복원','기록 내보내기, 폰 교체'],['settings','설정','이름, 임신 기준, 화면'],['help','도움말','처음 쓰는 방법'],['sources','참고 자료','안내의 근거']];
  return `<div class="stack"><div class="ptitle">더보기</div><div class="list">${m.map(([k,t,s])=>liBtn('go" data-v="'+k,t,s)).join('')}</div><div class="small faint">품 ${VERSION}${SIM?' · 시뮬레이션':''}. 기록은 이 폰 안에만 저장됩니다.</div></div>`}
 const head=t=>`<div class="row"><button class="icb" data-a="back" aria-label="뒤로" style="margin-left:-10px">${I.back}</button><div class="ptitle grow">${t}</div></div>`;
 function vEmergency(){const p=db.profile,t=today(),g=ga(t),li=lastInjection(),meds=db.meds.filter(m=>active(m,t));const reds=[];
@@ -259,7 +278,7 @@ function summaryText(){const p=db.profile,t=today(),from=add(t,-13),g=ga(t),l=[]
  const q=db.questions.filter(x=>!x.done);if(q.length){l.push('','[물어볼 질문]');for(const x of q)l.push(`- ${x.text}`)}return l.join('\n')}
 function vSummary(){return `<div class="stack">${head('진료 요약')}<textarea id="sumText" rows="16" readonly style="min-height:320px" aria-label="진료 요약">${esc(summaryText())}</textarea><button class="btn" data-a="copy" data-v="sumText">요약 복사</button><div class="small faint">진료실에서 이 화면을 보여주거나 복사해 메모에 붙일 수 있습니다.</div></div>`}
 function vSupport(){return `<div class="stack">${head('지원 제도')}<div class="list">${SUPPORT.map((x,i)=>`<label class="li" style="cursor:pointer"><input type="checkbox" style="width:22px;height:22px;accent-color:var(--acc);flex:none" data-c="sup" data-v="${i}" ${db.checks['sup'+i]?'checked':''}><span class="grow"><span class="t">${esc(x.t)}</span> <span class="tag t-other">${esc(x.when)}</span><br><span class="s">${esc(x.d)}</span><br><span class="s faint">${esc(x.src)}</span></span></label>`).join('')}</div><div class="small faint">금액과 대상은 바뀔 수 있습니다. 신청 전 공식 창구에서 확인하세요. 2026년 11월 기준입니다.</div></div>`}
-function vBackup(){const t=db.lastBackup;return `<div class="stack">${head('백업과 복원')}<div class="note info"><span>기록은 이 폰에만 있습니다. 2주에 한 번 백업 파일을 만들어 폰의 파일 앱에 보관하세요. ${t?`마지막 백업 ${fmtYMD(t)}.`:''}</span></div><section class="sec"><h2 style="font-size:1rem">내보내기</h2>${SIM?'':'<button class="btn" data-a="exportFile">백업 파일 만들기</button>'}<button class="btn sec2" data-a="exportCopy">백업 내용 복사</button><textarea id="bkOut" hidden readonly aria-label="백업 내용"></textarea></section><section class="sec"><h2 style="font-size:1rem">복원</h2><p class="small muted">복원하면 지금 폰의 기록이 백업 내용으로 바뀝니다.</p><div class="fld"><label for="bkFile">백업 파일 선택</label><input id="bkFile" type="file" accept=".json,application/json"></div><div class="fld"><label for="bkText">또는 백업 내용 붙여넣기</label><textarea id="bkText"></textarea></div><button class="btn sec2" data-a="restoreAsk">복원하기</button></section></div>`}
+function vBackup(){const t=db.lastBackup;return `<div class="stack">${head('백업과 복원')}<div class="note info"><span>기록은 이 폰에만 있습니다. 2주에 한 번 백업 파일을 만들어 폰의 파일 앱에 보관하세요. ${t?`마지막 백업 ${fmtYMD(t)}.`:''}</span></div><section class="sec"><h2 style="font-size:1rem">내보내기</h2>${SIM?'':'<button class="btn" data-a="exportFile">백업 파일 만들기</button>'}<button class="btn sec2" data-a="exportCopy">백업 내용 복사</button><div class="small muted">백업 파일에는 초음파 사진이 포함되고, 내용 복사에는 포함되지 않습니다.</div><textarea id="bkOut" hidden readonly aria-label="백업 내용"></textarea></section><section class="sec"><h2 style="font-size:1rem">복원</h2><p class="small muted">복원하면 지금 폰의 기록이 백업 내용으로 바뀝니다.</p><div class="fld"><label for="bkFile">백업 파일 선택</label><input id="bkFile" type="file" accept=".json,application/json"></div><div class="fld"><label for="bkText">또는 백업 내용 붙여넣기</label><textarea id="bkText"></textarea></div><button class="btn sec2" data-a="restoreAsk">복원하기</button></section></div>`}
 function vSettings(){const p=db.profile;return `<div class="stack">${head('설정')}<section class="sec"><h2 style="font-size:1rem">기본 정보</h2><div class="stack" style="gap:10px">${fld('sName','이름','text',p.name)}${sel('sBase','임신 기준',p.baseMode,[['transfer','배아 이식일'],['edd','출산 예정일(병원 안내)'],['lmp','마지막 생리 시작일']])}${p.baseMode==='transfer'?`<div class="grid2">${fld('sTrans','이식일','date',p.transferDate)}${sel('sEmb','이식한 배아',p.embryoDay,[[3,'3일 배아'],[5,'5일 배아'],[6,'6일 배아'],[2,'2일 배아']])}</div>`:p.baseMode==='edd'?fld('sEdd','출산 예정일','date',p.edd):fld('sLmp','마지막 생리 시작일','date',p.lmp)}${sel('sFetus','아기 수',p.fetus,[['unknown','미확인'],[1,'1명'],[2,'2명'],[3,'3명']])}${fld('sBirth','출산일(출산 후 입력)','date',p.birthDate)}</div></section><section class="sec"><h2 style="font-size:1rem">응급 카드 정보</h2><div class="stack" style="gap:10px"><div class="grid2">${sel('sBlood','혈액형',p.blood,[['','미입력'],['A','A'],['B','B'],['O','O'],['AB','AB']])}${sel('sRh','Rh',p.rh,[['','미입력'],['+','+'],['-','-']])}</div>${fld('sAllergy','약 알레르기','text',p.allergy)}<div class="grid2">${fld('sHosp','담당 병원','text',p.hospital)}${fld('sHospT','병원 전화','tel',p.hospitalTel)}</div><div class="grid2">${fld('sGuard','보호자','text',p.guardian)}${fld('sGuardT','보호자 전화','tel',p.guardianTel)}</div></div></section><section class="sec"><h2 style="font-size:1rem">안내 방식</h2><div class="stack" style="gap:10px">${sel('sAct','운동 지시',p.activity,[['normal','제한 없음'],['limited','병원에서 운동 제한'],['rest','안정 지시']])}<label class="check"><input type="checkbox" id="sNausea" ${p.nausea?'checked':''}>입덧 모드로 식단 보기</label><label class="check"><input type="checkbox" id="sHide" ${p.hideGuide?'checked':''}><span>주차 안내 숨기기<br><span class="small muted">안내가 부담스러울 때 약 기록과 달력만 남깁니다</span></span></label></div></section><section class="sec"><h2 style="font-size:1rem">화면</h2><div class="stack" style="gap:10px">${SIM?'':sel('sTheme','화면 테마',p.theme,[['system','폰 설정 따르기'],['light','밝게'],['dark','어둡게']])}<label class="check"><input type="checkbox" id="sLarge" ${p.fontLarge?'checked':''}>큰 글씨</label></div></section><button class="btn" data-a="saveSettings">저장</button><section class="sec"><h2 style="font-size:1rem">기록 삭제</h2><button class="btn sec2" data-a="wipeAsk">이 폰의 모든 기록 지우기</button></section></div>`}
 function vHelp(){return `<div class="stack">${head('도움말')}${HELP.map((s,i)=>`<details ${i===0?'open':''}><summary>${esc(s[0])}</summary><div>${s[1]}</div></details>`).join('')}</div>`}
 function vSources(){return `<div class="stack">${head('참고 자료')}<div class="list">${SOURCES.map(([t,u])=>`<a class="li" href="${esc(u)}" target="_blank" rel="noopener"><span class="grow t" style="font-weight:500">${esc(t)}</span>${I.chev}</a>`).join('')}</div><p class="small muted">품은 진단이나 처방을 하지 않습니다. 주차 안내, 운동, 식단은 일반 정보이며 시험관 임신, 다태, 항응고 치료 여부에 따라 달라질 수 있습니다. 담당 의료진의 지시를 우선하세요.</p></div>`}
@@ -286,9 +305,9 @@ function buildDb(seed){const d=emptyDb(),t=today();Object.assign(d.profile,seed.
 function openSheet(html){const el=$('#sheet');el.innerHTML=`<div class="scrim" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div></div>`;sheetOpen=true;pushNav()}
 function closeSheet(pop){$('#sheet').innerHTML='';sheetOpen=false;if(!pop)popNav()}
 const shh=t=>`<div class="shh"><h2>${t}</h2><button class="link" data-a="closeSheet">닫기</button></div>`;
-function pushNav(){if(SIM)return;history.pushState({n:++navDepth},'')}
-function popNav(){if(SIM||navDepth<=0)return;ignorePop=true;navDepth--;history.back()}
-let ignorePop=false;
+let navArmed=false;
+function pushNav(){if(SIM||navArmed)return;navArmed=true;history.pushState({p:1},'')}
+function popNav(){}
 function findItem(d,k){return slotsFor(d).find(i=>i.key===k)}
 function doseSheet(d,k){const i=findItem(d,k);if(!i)return;const r=i.rec||{},inj=i.m.type==='injection'&&!i.m.noSite;ui.site=r.site||null;
  openSheet(`${shh(esc(i.m.name)+' '+esc(i.m.dose||''))}<div class="small muted">${fmtLong(d)} · 예정 ${esc(i.time)}${i.s.label?' · '+esc(i.s.label):''}</div>${i.m.note?`<div class="note info"><span>${esc(i.m.note)}</span></div>`:''}${inj?`<div class="lbl">주사 위치</div><div id="bellyBox">${belly(ui.site,true)}</div>`:''}${fld('dAt','실제 시각','time',r.at||(d===today()?nowHM():i.time))}${fld('dMemo','메모(선택)','text',r.memo||'','placeholder="멍, 불편한 점 등"')}<button class="btn" data-a="doseSave" data-d="${d}" data-k="${esc(k)}">완료로 저장</button><div class="grid2"><button class="btn sec2" data-a="doseSkip" data-d="${d}" data-k="${esc(k)}">건너뜀</button><button class="btn sec2" data-a="doseClear" data-d="${d}" data-k="${esc(k)}">기록 지우기</button></div><div class="small muted">놓친 약을 다음에 두 배로 쓰지 마세요. 어떻게 할지는 병원에 확인하세요.</div>${inj?'<button class="btn ghost" data-a="go" data-v="sites" data-close="1">주사 방법과 위치 기록 보기</button>':''}`)}
@@ -364,18 +383,22 @@ const ACT={
    if(changed&&(past||m.start<t)){const nid=uid(),nm=Object.assign({},m,o,{id:nid,start:t});m.end=add(t,-1);const r=db.doses[t]||{};for(const k of Object.keys(r))if(k.startsWith(m.id+'|')){const nk=nid+'|'+k.split('|')[1];if(o.slots.some(s=>s.id===k.split('|')[1])){r[nk]=r[k];delete r[k]}}db.meds.push(nm)}else Object.assign(m,o)}
   else db.meds.push(Object.assign({id:uid(),start:t},o));save();closeSheet();render();toast(calState().st==='changed'?'약 시간이 바뀌었습니다. 캘린더 알림을 다시 만들어 주세요.':'처방을 저장했습니다')},
  medEnd(d){const m=db.meds.find(x=>x.id===d.id);m.end=today();save();closeSheet();render();toast('오늘까지 사용으로 저장했습니다')},
+ async photoSave(){const dt=$('#pD').value;if(!dt){toast('촬영일을 입력해 주세요');return}const p={id:uid(),date:dt,memo:$('#pM').value.trim(),data:ui.ph.data,thumb:ui.ph.thumb};try{await Store.photoPut(p);photos.push(p);ui.ph=null;closeSheet();render();toast('사진을 저장했습니다')}catch(e){toast('사진을 저장하지 못했습니다. 폰 저장 공간을 확인해 주세요.')}},
+ photoView(d){photoView(d.id)},
+ photoDelAsk(d){closeSheet();ui.delPhoto=d.id;askSheet('사진을 지울까요?','이 폰에서 사진이 지워집니다. 백업이 없으면 되돌릴 수 없습니다.','photoDelGo','지우기')},
+ async photoDelGo(){await Store.photoDel(ui.delPhoto);photos=photos.filter(p=>p.id!==ui.delPhoto);closeSheet();render();toast('사진을 지웠습니다')},
  calOpen(){calSheet()},
  async calSend(){const ts=alarmTimes();ui.calSent=true;const dn=$('#calDoneBtn');if(dn)dn.disabled=false;if(SIM){toast('시뮬레이션에서는 파일을 만들지 않습니다');return}const data=buildIcs(ts,today()),f=new File([data],'poom-alarm.ics',{type:'text/calendar'});try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'품 캘린더 알림'});return}}catch(e){if(e&&e.name==='AbortError')return}saveIcsLink(ts);toast('파일을 저장했습니다')},
  calDone(){db.calExport={date:today(),times:alarmTimes()};save();closeSheet();render();toast('캘린더 알림을 저장했습니다')},
  calPageGet(){saveIcsLink(ui.calPage)},
  copy(d){copyText($('#'+d.v).value,$('#'+d.v))},
- async exportFile(){const data=JSON.stringify(db),name=`poom-backup-${today()}.json`,f=new File([data],name,{type:'application/json'});try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'품 백업'})}else{const u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000)}db.lastBackup=today();await save();render();toast('백업 파일을 만들었습니다')}catch(e){if(e&&e.name!=='AbortError')toast('파일을 만들지 못했습니다. 백업 내용 복사를 이용하세요.')}},
+ async exportFile(){const data=JSON.stringify(Object.assign({},db,{photoData:photos})),name=`poom-backup-${today()}.json`,f=new File([data],name,{type:'application/json'});try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'품 백업'})}else{const u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000)}db.lastBackup=today();await save();render();toast('백업 파일을 만들었습니다')}catch(e){if(e&&e.name!=='AbortError')toast('파일을 만들지 못했습니다. 백업 내용 복사를 이용하세요.')}},
  exportCopy(){db.lastBackup=today();save();copyText(JSON.stringify(db),$('#bkOut'))},
  async restoreAsk(){let t=$('#bkText').value.trim();const f=$('#bkFile').files[0];if(f)t=await f.text();if(!t){toast('백업 파일을 고르거나 내용을 붙여넣어 주세요');return}try{const o=JSON.parse(t);if(!o||!o.profile||!Array.isArray(o.meds)||!o.doses)throw 0;ui.pending=o;askSheet('복원할까요?',`${o.updatedAt?new Date(o.updatedAt).toLocaleDateString('ko-KR')+' 기록으로 ':''}지금 폰의 기록을 바꿉니다.`,'restoreGo','복원')}catch(e){toast('백업 형식이 맞지 않습니다. 파일을 다시 확인해 주세요.')}},
- async restoreGo(){db=Object.assign(emptyDb(),ui.pending);await save();closeSheet();stack=[];view='today';render();toast('복원했습니다')},
+ async restoreGo(){const pd=ui.pending.photoData;delete ui.pending.photoData;db=Object.assign(emptyDb(),ui.pending);await save();if(Array.isArray(pd)){const ok=pd.filter(p=>p&&typeof p.id==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(p.date||'')&&/^data:image\//.test(p.data||'')&&/^data:image\//.test(p.thumb||''));await Store.photoClear();for(const p of ok)await Store.photoPut(p);photos=ok}closeSheet();stack=[];view='today';render();toast('복원했습니다')},
  saveSettings(){const p=db.profile,v=id=>{const e=$('#'+id);return e?e.value:undefined},set=(k,id)=>{const x=v(id);if(x!==undefined)p[k]=x};set('name','sName');const nb=v('sBase');set('transferDate','sTrans');set('embryoDay','sEmb');set('edd','sEdd');set('lmp','sLmp');set('fetus','sFetus');set('birthDate','sBirth');set('blood','sBlood');set('rh','sRh');set('allergy','sAllergy');set('hospital','sHosp');set('hospitalTel','sHospT');set('guardian','sGuard');set('guardianTel','sGuardT');set('activity','sAct');set('theme','sTheme');p.nausea=$('#sNausea').checked;p.hideGuide=$('#sHide').checked;p.fontLarge=$('#sLarge').checked;p.baseMode=nb;ui.gw=null;applyPrefs();save();render();toast('저장했습니다')},
  wipeAsk(){askSheet('모든 기록을 지울까요?','약 기록, 달력, 수치, 설정이 이 폰에서 모두 사라집니다. 먼저 백업하세요. 되돌릴 수 없습니다.','wipeGo','모두 지우기')},
- async wipeGo(){await Store.clear();db=null;closeSheet();stack=[];view='today';ui.setup={step:'start'};if(SIM){await simReset();return}render()},
+ async wipeGo(){await Store.clear();photos=[];db=null;closeSheet();stack=[];view='today';ui.setup={step:'start'};if(SIM){await simReset();return}render()},
  async codeGo(){const t=$('#code').value;if(!t.trim()){toast('설정 코드를 붙여넣어 주세요');return}try{ui.setup={step:'confirm',seed:decodeSetup(t)};render();scrollTo(0,0)}catch(e){toast('설정 코드를 읽지 못했습니다. 끊기지 않게 전체를 붙여넣어 주세요.')}},
  manualGo(){ui.setup={step:'confirm',seed:{profile:{name:'',baseMode:'transfer',transferDate:'',embryoDay:3},meds:[]}};render()},
  helpFirst(){ui.setup={step:'help'};render();scrollTo(0,0)},
@@ -385,6 +408,7 @@ const ACT={
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el)return;const a=ACT[el.dataset.a];if(a){if(el.dataset.a==='scrim'&&e.target!==el)return;a(el.dataset,el,e)}});
 document.addEventListener('change',e=>{const c=e.target.dataset&&e.target.dataset.c;if(!c)return;const v=e.target.dataset.v;
+ if(c==='photo'){const f=e.target.files&&e.target.files[0];e.target.value='';if(f)pickPhoto(f);return}
  if(c==='calCleared'){const on=e.target.checked,b=$('#calSendBtn'),l=$('#calSafari');if(b)b.disabled=!on;if(l)l.hidden=!on}
  if(c==='ms'){db.checks[v]=e.target.checked;save()}
  if(c==='sup'){db.checks['sup'+v]=e.target.checked;save()}
@@ -394,7 +418,7 @@ document.addEventListener('change',e=>{const c=e.target.dataset&&e.target.datase
  if(c==='slotT')ui.ms[Number(v)].time=e.target.value;
  if(c==='seedTime')ui.setup.seed.meds[Number(e.target.dataset.m)].slots[Number(e.target.dataset.s)].time=e.target.value;
  if(e.target.id==='sBase'){db.profile.baseMode=e.target.value;render()}});
-window.addEventListener('popstate',()=>{if(ignorePop){ignorePop=false;return}if(navDepth>0)navDepth--;if(sheetOpen){closeSheet(true);return}if(stack.length){stack.pop();render()}});
+window.addEventListener('popstate',()=>{navArmed=false;if(sheetOpen)closeSheet(true);else if(stack.length){stack.pop();render()}if(sheetOpen||stack.length)pushNav()});
 
 /* 화면 */
 function applyPrefs(){if(!db)return;const p=db.profile;document.body.classList.toggle('large',!!p.fontLarge);if(!SIM){if(p.theme==='system')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',p.theme)}}
@@ -402,7 +426,7 @@ function render(){const root=$('#root'),nav=$('#nav');lastDay=today();
  if(ui.calPage){root.innerHTML=vCalPage();nav.innerHTML='';return}
  if(window.__simBar)window.__simBar();
  if(!db){root.innerHTML=vSetup();nav.innerHTML='';return}
- const sub=stack[stack.length-1];const V={emergency:vEmergency,meds:vMeds,sites:vSites,alarm:vAlarm,summary:vSummary,support:vSupport,backup:vBackup,settings:vSettings,help:vHelp,sources:vSources};
+ const sub=stack[stack.length-1];const V={album:vAlbum,emergency:vEmergency,meds:vMeds,sites:vSites,alarm:vAlarm,summary:vSummary,support:vSupport,backup:vBackup,settings:vSettings,help:vHelp,sources:vSources};
  const views={today:vToday,cal:vCal,guide:vGuide,log:vLog,more:vMore};
  if(db.profile.hideGuide&&view==='guide')view='today';
  root.innerHTML=(sub?V[sub]:views[view])();
@@ -412,7 +436,7 @@ setInterval(()=>{if(db&&!sheetOpen&&!document.activeElement.matches('input,texta
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&db&&!sheetOpen&&lastDay!==today()){ui.sel=null;ui.month=null;ui.gw=null;render()}});
 async function boot(){if(SIM){await window.__simBoot();return}
  const cm=location.hash.match(/^#cal=(\d{4}(?:,\d{4}){0,23})$/);if(cm){ui.calPage=cm[1].split(',').map(x=>x.slice(0,2)+':'+x.slice(2)).filter(x=>/^([01]\d|2[0-3]):[0-5]\d$/.test(x));if(ui.calPage.length){render();return}ui.calPage=null}
- db=await Store.get();if(db){db=Object.assign(emptyDb(),db);applyPrefs()}render();
+ db=await Store.get();photos=await Store.photoAll();if(db){db=Object.assign(emptyDb(),db);applyPrefs()}render();
  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window.__bip=e;if(!db)render()});
  if('serviceWorker'in navigator){try{const r=await navigator.serviceWorker.register('./sw.js');r.addEventListener('updatefound',()=>{const n=r.installing;if(n)n.addEventListener('statechange',()=>{if(n.state==='installed'&&navigator.serviceWorker.controller)toast('새 버전이 준비되었습니다. 앱을 다시 열면 적용됩니다.')})})}catch(e){}}
  try{if(db&&navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}}

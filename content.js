@@ -320,11 +320,36 @@ const HELP = [
  ['주사 위치',`<p>주사의 동그라미를 누르면 복부 지도가 열립니다. 왼쪽과 오른쪽을 위, 가운데, 아래로 나눈 6곳 중 한 곳을 고르고 저장합니다.</p><p>점선 칸이 추천 위치입니다. 직전 주사의 반대쪽에서 가장 오래 쉰 곳을 고릅니다. 멍이 있으면 다른 칸을 고르세요.</p><p>배가 커지면 위치를 어떻게 옮길지 병원에 확인하세요.</p>`],
  ['달력',`<p>날짜 아래 점은 약 종류입니다. 꽉 찬 점은 그날 완료, 빈 원은 미완료 또는 앞으로의 예정입니다. 앞으로의 날짜는 처방의 마지막 날까지 표시되고, 마지막 날이 없는 약은 출산 예정일까지 표시됩니다. 날짜를 누르면 아래에 그날의 약, 주사 위치, 증상, 수치가 나옵니다.</p><p>진료나 시술 날짜는 날짜를 누른 뒤 이 날 일정 추가로 넣습니다.</p>`],
  ['주차, 운동, 식단',`<p>이식일과 배아 일수로 주수를 계산합니다. 병원이 예정일을 알려주면 설정에서 임신 기준을 출산 예정일로 바꾸세요.</p><p>초음파에서 아기 수를 들으면 설정에 입력합니다. 다태 안내가 함께 바뀝니다.</p><p>병원에서 운동을 제한했다면 설정의 운동 지시를 바꾸세요. 운동 추천이 호흡과 휴식으로 바뀝니다.</p>`],
+ ['초음파 사진',`<p>주차 탭의 주차별 화면이나 더보기의 초음파 앨범에서 초음파 사진 넣기를 누릅니다. 사진을 고르고 촬영일을 확인한 뒤 저장하면 해당 주차에 모입니다.</p><p>사진을 누르면 크게 볼 수 있고, 메모와 삭제도 그 화면에서 합니다. 달력에서 촬영한 날짜를 눌러도 볼 수 있습니다.</p><p class="small muted">사진은 이 폰에만 저장되고 서버로 보내지 않습니다. 사진을 보존하려면 백업 파일을 만들어 주세요. 주차 안내 숨기기를 켜면 사진도 화면에서 숨겨집니다.</p>`],
  ['기록 탭',`<p>hCG 같은 검사 수치, 체중, 혈압, 증상, 병원에 물어볼 질문, 태동, 진통 간격을 기록합니다.</p><p>더보기의 진료 요약은 최근 14일의 기록을 정리합니다. 진료실에서 보여주거나 복사해서 쓰세요.</p>`],
  ['응급 카드',`<p>더보기의 응급 카드에는 주수, 현재 약, 마지막 주사 시각, 연락처가 모입니다. 항응고 주사를 쓰면 마지막 주사 시각이 의료진에게 중요합니다.</p><p>설정에서 혈액형, 병원 전화, 보호자 전화를 입력해 두세요.</p>`],
  ['알림 받기',`<p>품은 앱을 닫아두면 직접 알림을 보낼 수 없습니다. 대신 캘린더 파일을 만들어 폰 캘린더에 넣으면 매일 같은 시간에 캘린더 알림이 뜹니다.</p><ol><li>더보기에서 알람 맞추기를 엽니다.</li><li>캘린더 파일 만들기를 누릅니다.</li><li>화면의 순서대로 파일을 캘린더에 넣습니다.</li><li>캘린더에 넣었습니다를 누릅니다.</li></ol><p>같은 시간대의 약만 바뀌면 캘린더를 고치지 않아도 됩니다. 약 시간이 바뀌면 품이 다시 만들라고 알려줍니다.</p><p><b>새 파일을 넣기 전에는 기존 품 일정을 지워주세요.</b> 지우지 않으면 같은 알림이 두 번 올 수 있습니다.</p><p class="small muted">캘린더 알림은 품과 연결되어 있지 않습니다. 알림을 받은 뒤 품에서 완료를 눌러주세요.</p>`],
- ['백업과 폰 교체',`<p>기록은 이 폰에만 있어 앱을 지우거나 폰을 바꾸면 사라질 수 있습니다. 2주에 한 번 더보기의 백업과 복원에서 파일을 만드세요.</p><p>새 폰에서는 앱을 설치한 뒤, 첫 화면에서 직접 입력으로 시작하고 백업과 복원에서 파일을 불러옵니다.</p><p class="small muted">백업 파일에는 건강 정보가 들어 있으니 다른 사람에게 보내지 마세요.</p>`],
+ ['백업과 폰 교체',`<p>기록은 이 폰에만 있어 앱을 지우거나 폰을 바꾸면 사라질 수 있습니다. 2주에 한 번 더보기의 백업과 복원에서 파일을 만드세요. 백업 파일에는 초음파 사진도 포함됩니다.</p><p>새 폰에서는 앱을 설치한 뒤, 첫 화면에서 직접 입력으로 시작하고 백업과 복원에서 파일을 불러옵니다.</p><p class="small muted">백업 파일에는 건강 정보가 들어 있으니 다른 사람에게 보내지 마세요.</p>`],
  ['주차 안내를 쉬고 싶을 때',`<p>설정의 주차 안내 숨기기를 켜면 주수와 추천이 사라지고 약 기록과 달력만 남습니다. 언제든 다시 켤 수 있습니다.</p>`],
  ['문제가 생겼을 때',`<p><b>화면이 이상합니다.</b> 앱을 완전히 닫았다가 다시 여세요.</p><p><b>기록이 없어졌습니다.</b> 홈 화면 앱으로 열었는지 확인하고, Safari에서 연 화면이 아닌지 보세요. 백업이 있으면 복원합니다.</p><p><b>약이 바뀌었습니다.</b> 처방 관리에서 수정하면 오늘부터 적용되고 지난 기록은 그대로 남습니다.</p>`],
  ['안전 안내',`<p>품은 의료기기가 아니며 진단이나 처방을 하지 않습니다. 약의 용량, 시작, 중단은 담당 의료진이 정합니다. 위험 신호가 있으면 앱 기록보다 병원 연락이 먼저입니다.</p>`]
 ];
+
+/* 주차 일러스트: 사실 묘사가 아닌 이해를 돕는 단순 그림 */
+const ART_STAGES=[
+ {to:5,k:'sac',cap:'아기집이 자궁 안에 자리 잡는 시기'},
+ {to:7,k:'bud',cap:'작은 몸과 난황이 보이는 시기'},
+ {to:9,k:'early',cap:'머리와 팔다리 싹이 자라는 시기'},
+ {to:13,k:'f1',cap:'사람의 모습을 갖춰가는 시기'},
+ {to:19,k:'f2',cap:'몸이 길어지고 움직임이 늘어나는 시기'},
+ {to:27,k:'f3',cap:'몸이 커지고 태동이 뚜렷해지는 시기'},
+ {to:33,k:'f4',cap:'살이 붙고 공간이 좁아지는 시기'},
+ {to:42,k:'f5',cap:'머리가 아래로 향하는 경우가 많은 시기'}
+];
+function fetusBody(o){const b='var(--art-body)',s='var(--art-shade)',i='var(--art-ink)';
+ return `<g transform="translate(${o.x} ${o.y}) rotate(${o.r}) scale(${o.s})"><path d="M26 36C50 34 58 6 34 -2" fill="none" stroke="${s}" stroke-width="13" stroke-linecap="round"/><path d="M-16 -16C-36 4 -30 42 2 54C32 62 46 30 38 6C32 -14 8 -30 -16 -16Z" fill="${b}"/><circle cx="-12" cy="${-30-o.h*.42}" r="${o.h}" fill="${b}"/><path d="M-6 ${-30-o.h*.42}c5 -3 9 2 5 7" fill="none" stroke="${s}" stroke-width="2.6" stroke-linecap="round"/><path d="M${-16-o.h*.62} ${-32-o.h*.42}q5 4 10 0" fill="none" stroke="${i}" stroke-width="2.4" stroke-linecap="round"/><path d="M-6 -4C-24 8 -36 2 -38 -12" fill="none" stroke="${s}" stroke-width="9.5" stroke-linecap="round"/><circle cx="-38" cy="-15" r="6.4" fill="${s}"/><path d="M24 46C2 54 -22 46 -26 28" fill="none" stroke="${s}" stroke-width="12.5" stroke-linecap="round"/><ellipse cx="-30" cy="23" rx="10" ry="6.2" transform="rotate(-24 -30 23)" fill="${s}"/></g>`}
+function artSvg(w){const a=ART_STAGES.find(x=>w<=x.to)||ART_STAGES[7],b='var(--art-body)',s='var(--art-shade)',ring='var(--art-ring)';let c='';
+ if(a.k==='sac')c=`<circle cx="4" cy="4" r="44" fill="var(--art-sac)" stroke="${ring}" stroke-width="2.5"/><circle cx="-12" cy="16" r="4.6" fill="${s}"/>`;
+ if(a.k==='bud')c=`<circle cx="0" cy="2" r="58" fill="var(--art-sac)" stroke="${ring}" stroke-width="2.5"/><circle cx="-27" cy="24" r="10" fill="none" stroke="${s}" stroke-width="3"/><path d="M-17 21C-10 18 -4 16 2 12" fill="none" stroke="${s}" stroke-width="2"/><path d="M-8 -22C14 -36 36 -12 24 12C16 28 2 32 -6 26C4 22 8 14 6 6C4 -4 -2 -8 -12 -8C-20 -8 -18 -18 -8 -22Z" fill="${b}"/>`;
+ if(a.k==='early')c=`<circle cx="0" cy="0" r="70" fill="var(--art-sac)" stroke="${ring}" stroke-width="2.5"/><circle cx="-41" cy="34" r="8" fill="none" stroke="${s}" stroke-width="2.6"/><g transform="translate(6 2)"><path d="M-12 -8C-30 8 -22 36 4 38C26 38 34 12 22 -8C14 -20 -2 -18 -12 -8Z" fill="${b}"/><circle cx="-8" cy="-24" r="24" fill="${b}"/><path d="M-22 -26q4 3 8 0" fill="none" stroke="var(--art-ink)" stroke-width="2" stroke-linecap="round"/><path d="M-10 4C-18 10 -24 8 -26 2" fill="none" stroke="${s}" stroke-width="7" stroke-linecap="round"/><path d="M6 32C-2 38 -14 36 -16 30" fill="none" stroke="${s}" stroke-width="8" stroke-linecap="round"/></g>`;
+ const P={f1:{x:4,y:6,r:0,s:.62,h:31},f2:{x:3,y:9,r:6,s:.76,h:28},f3:{x:3,y:11,r:10,s:.9,h:26.5},f4:{x:2,y:12,r:14,s:1.02,h:25.5},f5:{x:0,y:-10,r:176,s:1.1,h:25}};
+ if(P[a.k]){const big=a.k==='f1'||a.k==='f2';c=`${big?`<circle cx="0" cy="0" r="${a.k==='f1'?72:82}" fill="var(--art-sac)" stroke="${ring}" stroke-width="2.5"/>`:''}`+fetusBody(P[a.k])}
+ return `<svg class="art" viewBox="-100 -100 200 200" role="img" aria-label="${esc(a.cap)}"><circle cx="0" cy="0" r="96" fill="var(--art-bg)"/>${c}</svg>`}
+function sizeOf(w){const m=(WEEKS[w].baby.match(/약 ([\d.]+)(mm|cm)/)||[]);return m[1]?Number(m[1])*(m[2]==='cm'?10:1):510}
+function sizeScale(w){const W=280,L=14,R=14,lo=Math.log10(.1),hi=Math.log10(600),X=v=>L+(Math.log10(v)-lo)/(hi-lo)*(W-L-R),v=sizeOf(w),x=X(v),ticks=[[1,'1mm'],[10,'1cm'],[100,'10cm'],[500,'50cm']];
+ return `<svg class="scale" viewBox="0 0 ${W} 40" role="img" aria-label="아기 크기 눈금"><line x1="${L}" x2="${W-R}" y1="14" y2="14" class="s0"/><line x1="${L}" x2="${x.toFixed(1)}" y1="14" y2="14" class="s1"/>${ticks.map(([t,l])=>`<line x1="${X(t).toFixed(1)}" x2="${X(t).toFixed(1)}" y1="9" y2="19" class="s0"/><text x="${X(t).toFixed(1)}" y="35" text-anchor="middle">${l}</text>`).join('')}<circle cx="${x.toFixed(1)}" cy="14" r="6" class="s2"/></svg>`}
