@@ -59,6 +59,7 @@ function slotsFor(date){const out=[],recs=db.doses[date]||{},used=new Set();
 function dayStat(date){const items=slotsFor(date);let due=0,done=0;const by={};
  for(const i of items){const t=i.m.type;by[t]=by[t]||{due:0,done:0};by[t].due++;due++;if(i.rec){by[t].done++;done++}}
  return{due,done,by,items}}
+function planStat(s){const t=today();if(s<=t)return dayStat(s);const lim=edd()||add(t,280),items=slotsFor(s).filter(i=>i.m.end||s<=lim),by={};for(const i of items){const k=i.m.type;by[k]=by[k]||{due:0,done:0};by[k].due++}return{due:items.length,done:0,by,items}}
 function record(date,i,o){db.doses[date]=db.doses[date]||{};const prev=db.doses[date][i.key]||{};
  db.doses[date][i.key]=Object.assign(prev,{s:'done',name:i.m.name,dose:i.m.dose,type:i.m.type,time:i.time,label:i.s.label},o)}
 function clearDose(date,key){if(db.doses[date]){delete db.doses[date][key];if(!Object.keys(db.doses[date]).length)delete db.doses[date]}}
@@ -147,11 +148,11 @@ const clampW=w=>Math.min(41,Math.max(4,w==null?4:w));
 /* 달력 */
 function vCal(){const t=today();ui.sel=ui.sel||t;ui.month=ui.month||t.slice(0,7);const[y,m]=ui.month.split('-').map(Number),first=new Date(y,m-1,1,12),days=new Date(y,m,0).getDate(),lead=first.getDay();
  let c=WD.map((d,i)=>`<div class="wd ${i===0?'sun':''}">${d}</div>`).join('');for(let i=0;i<lead;i++)c+='<div class="cell other"></div>';
- const l=lmp();for(let d=1;d<=days;d++){const s=`${y}-${pad(m)}-${pad(d)}`,f=s<=t?dayStat(s):{by:{}},ap=db.appts.filter(a=>a.date===s);let dots='';
+ const l=lmp();for(let d=1;d<=days;d++){const s=`${y}-${pad(m)}-${pad(d)}`,f=planStat(s),ap=db.appts.filter(a=>a.date===s);let dots='';
   for(const k of ['injection','oral','vaginal','supp','other'])if(f.by[k]){const fin=f.by[k].done>=f.by[k].due;dots+=`<i class="dot c-${k} ${fin?'f':''}"></i>`}
   for(const a of ap)dots+=`<i class="dot f c-${a.kind==='procedure'?'procedure':'visit'}"></i>`;
   const newWk=l&&!db.profile.hideGuide&&diff(s,l)>=0&&diff(s,l)%7===0&&diff(s,l)<=294;
-  const lab=`${d}일, 완료 ${f.done||0}/${f.due||0}`;
+  const lab=s>t?`${d}일, 예정 ${f.due}건`:`${d}일, 완료 ${f.done||0}/${f.due||0}`;
   c+=`<button class="cell ${s===t?'today':''} ${s===ui.sel?'sel':''}" data-a="pick" data-v="${s}" aria-label="${lab}"><span class="d">${d}</span>${newWk?`<span class="wk">${diff(s,l)/7}주</span>`:''}<span class="dots">${dots}</span></button>`}
  const s=ui.sel,dd=db.days[s]||{},syms=SYM.filter(x=>(dd.sym||{})[x[0]]).map(x=>x[1]),ap=db.appts.filter(a=>a.date===s),labs=db.labs.filter(x=>x.date===s),g=ga(s);
  let d=`<section class="sec"><div class="sech"><h2>${fmtLong(s)}</h2><span class="small muted num">${g!=null&&g>=0&&!db.profile.hideGuide?fmtGA(g):''}</span></div>${s<=t?doseList(s):upcomingNote(s)}`;
@@ -161,8 +162,8 @@ function vCal(){const t=today();ui.sel=ui.sel||t;ui.month=ui.month||t.slice(0,7)
  if(info.length)d+=`<div class="list">${info.map(([a,b])=>`<div class="li"><span class="small muted" style="width:62px;flex:none">${a}</span><span class="grow">${b}</span></div>`).join('')}</div>`;
  if(s<=t)d+=`<button class="btn sec2" data-a="bodySheet" data-d="${s}">이 날 몸 상태 기록</button>`;
  d+=`<button class="btn sec2" data-a="apptSheet" data-d="${s}">이 날 일정 추가</button></section>`;
- return `<div class="stack"><div class="calh"><button class="icb" data-a="mon" data-v="-1" aria-label="이전 달">${I.back}</button><div class="m">${y}년 ${m}월</div><button class="icb" data-a="mon" data-v="1" aria-label="다음 달">${I.next}</button></div><div class="cal">${c}</div><div class="legend"><span><i class="dot f c-injection"></i>주사</span><span><i class="dot f c-oral"></i>경구약</span><span><i class="dot f c-vaginal"></i>질정</span><span><i class="dot f c-procedure"></i>시술</span><span><i class="dot f c-visit"></i>내원</span><span><i class="dot"></i>빈 원은 미완료</span></div>${d}</div>`}
-function upcomingNote(s){const n=slotsFor(s).length;return `<div class="note info"><span>이 날 예정된 약은 ${n}건입니다. 당일에 기록할 수 있습니다.</span></div>`}
+ return `<div class="stack"><div class="calh"><button class="icb" data-a="mon" data-v="-1" aria-label="이전 달">${I.back}</button><div class="m">${y}년 ${m}월</div><button class="icb" data-a="mon" data-v="1" aria-label="다음 달">${I.next}</button></div><div class="cal">${c}</div><div class="legend"><span><i class="dot f c-injection"></i>주사</span><span><i class="dot f c-oral"></i>경구약</span><span><i class="dot f c-vaginal"></i>질정</span><span><i class="dot f c-procedure"></i>시술</span><span><i class="dot f c-visit"></i>내원</span><span><i class="dot"></i>빈 원은 미완료·예정</span></div>${d}</div>`}
+function upcomingNote(s){const n=planStat(s).due;return `<div class="note info"><span>이 날 예정된 약은 ${n}건입니다. 당일에 기록할 수 있습니다.</span></div>`}
 
 /* 주차 안내 */
 function vGuide(){const t=today();ui.gw=ui.gw||clampW(wk(t));if(!lmp())return `<div class="stack"><div class="ptitle">주차 안내</div><div class="note info"><span>설정에서 이식일이나 출산 예정일을 입력하면 주차별 안내가 표시됩니다.</span></div><button class="btn" data-a="go" data-v="settings">설정 열기</button></div>`;
