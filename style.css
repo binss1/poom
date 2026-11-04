@@ -223,3 +223,5 @@ label.btn{cursor:pointer}
 .supi details>div{padding:12px 0 2px}
 .supi.ok summary .t{color:var(--ink2)}
 .supi b{font-size:.86rem}
+.term{color:inherit;text-decoration:underline dotted var(--acc);text-decoration-thickness:1.5px;text-underline-offset:3px}
+.gl+.gl{margin-top:6px}
