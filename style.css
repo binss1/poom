@@ -94,7 +94,7 @@ li+li{margin-top:.28em}
 .cell.other{visibility:hidden}
 .cell.today .d{background:var(--acc);color:var(--on);border-radius:50%;width:1.6em;height:1.6em;display:grid;place-items:center;font-weight:700}
 .cell.sel{background:var(--acc-soft)}
-.cell .wk{font-size:.66rem;color:var(--ink2);line-height:1}
+.cell .wk{font-size:.68rem;font-weight:700;color:var(--on);background:var(--acc);line-height:1;padding:3px 6px;border-radius:9px;white-space:nowrap}
 .dots{display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:34px}
 .dot{width:7px;height:7px;border-radius:50%;border:1.5px solid currentColor;background:transparent}
 .dot.f{background:currentColor}

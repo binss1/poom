@@ -1,5 +1,5 @@
 'use strict';
-const SIM=!!window.POOM_SIM, NS=SIM?'poom-sim':'poom', VERSION='1.1.0', BUILD='1bd715ad', KEY=NS+'.db';
+const SIM=!!window.POOM_SIM, NS=SIM?'poom-sim':'poom', VERSION='1.1.0', BUILD='beb56764', KEY=NS+'.db';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
