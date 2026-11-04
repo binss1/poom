@@ -208,3 +208,17 @@ a.btn{text-decoration:none}
 .phbig{width:100%;max-height:58vh;object-fit:contain;border-radius:10px;background:#000;display:block}
 .vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
 label.btn{cursor:pointer}
+.sups{background:var(--sf);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.supi{display:flex;gap:10px;align-items:flex-start;padding:12px}
+.supi+.supi{border-top:1px solid var(--line)}
+.supi>input{width:22px;height:22px;margin-top:2px;accent-color:var(--acc);flex:none}
+.supi details{flex:1;min-width:0;background:none;border:0;border-radius:0}
+.supi summary{display:flex;align-items:center;gap:8px;padding:0;min-height:0;list-style:none;font-weight:400}
+.supi summary::-webkit-details-marker{display:none}
+.supi summary .t{font-weight:700}
+.supi summary .amt{display:block;color:var(--acc);font-weight:700;font-size:.92rem;margin-top:2px}
+.supi summary .s{display:block;font-size:.82rem;color:var(--ink2);margin-top:1px}
+.supi details[open] summary .chev{transform:rotate(90deg)}
+.supi details>div{padding:12px 0 2px}
+.supi.ok summary .t{color:var(--ink2)}
+.supi b{font-size:.86rem}
