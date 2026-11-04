@@ -56,14 +56,14 @@ const born=()=>!!db.profile.birthDate;
 
 /* 약 일정 */
 const active=(m,d)=>d>=m.start&&(!m.end||d<=m.end);
-function slotsFor(date){const out=[],recs=db.doses[date]||{},used=new Set();
- for(const m of db.meds){if(!active(m,date))continue;
+function slotsFor(date){const out=[],recs=db.doses[date]||{},used=new Set(),bf=ui.backfill===date,names=new Set();
+ for(const m of db.meds){if(!active(m,date)){if(!bf||date>=m.start||(m.end&&date>m.end)||names.has(m.name))continue;names.add(m.name)}
   for(const s of m.slots){const key=m.id+'|'+s.id;used.add(key);out.push({key,m,s,time:s.time,rec:recs[key]})}}
  for(const key of Object.keys(recs)){if(used.has(key))continue;const r=recs[key];
   out.push({key,m:{id:key.split('|')[0],name:r.name,dose:r.dose,type:r.type,slots:[],note:''},s:{id:key.split('|')[1],label:r.label||'',time:r.time},time:r.time||'',rec:r})}
  return out.sort((a,b)=>(a.time||'').localeCompare(b.time||'')||a.m.name.localeCompare(b.m.name))}
 function dayStat(date){const items=slotsFor(date);let due=0,done=0;const by={};
- for(const i of items){const t=i.m.type;by[t]=by[t]||{due:0,done:0};by[t].due++;due++;if(i.rec){by[t].done++;done++}}
+ for(const i of items){const t=i.m.type;by[t]=by[t]||{due:0,done:0};by[t].due++;due++;if(i.rec&&i.rec.s==='done'){by[t].done++;done++}}
  return{due,done,by,items}}
 function planStat(s){const t=today();if(s<=t)return dayStat(s);const lim=edd()||add(t,280),items=slotsFor(s).filter(i=>i.m.end||s<=lim),by={};for(const i of items){const k=i.m.type;by[k]=by[k]||{due:0,done:0};by[k].due++}return{due:items.length,done:0,by,items}}
 function record(date,i,o){db.doses[date]=db.doses[date]||{};const prev=db.doses[date][i.key]||{};
@@ -75,7 +75,8 @@ function suggestSite(){const log=siteLog();if(!log.length)return null;const side
  const order=[side+'M',side+'U',side+'L'];let best=order[0],bestAge=-1;
  for(const z of order){const f=log.findIndex(x=>x.site===z);const age=f<0?1e6:f;if(age>bestAge){bestAge=age;best=z}}return best}
 function lastInjection(){let best=null;for(const d of Object.keys(db.doses))for(const k of Object.keys(db.doses[d])){const r=db.doses[d][k];if(r.type==='injection'&&r.s==='done'){const v=d+' '+(r.at||'');if(!best||v>best.v)best={v,date:d,at:r.at,name:r.name,dose:r.dose,site:r.site}}}return best}
-function remaining(m){if(m.stock==null||m.stock==='')return null;let used=0;for(const d of Object.keys(db.doses)){if(d<(m.stockDate||'0'))continue;for(const k of Object.keys(db.doses[d]))if(k.split('|')[0]===m.id&&db.doses[d][k].s==='done')used++}return Number(m.stock)-used}
+function usedOn(m,d){const x=db.doses[d]||{};return Object.keys(x).filter(k=>k.split('|')[0]===m.id&&x[k].s==='done').length}
+function remaining(m){if(m.stock==null||m.stock==='')return null;let used=0;for(const d of Object.keys(db.doses)){if(d<(m.stockDate||'0'))continue;for(const k of Object.keys(db.doses[d]))if(k.split('|')[0]===m.id&&db.doses[d][k].s==='done')used++}return Math.max(0,Number(m.stock)-used)}
 function gapMsg(date,i,at){if(!i.m.gap||!at)return'';const list=[];for(const d of [add(date,-1),date]){const r=db.doses[d]||{};for(const k of Object.keys(r))if(k.split('|')[0]===i.m.id&&k!==i.key&&r[k].s==='done'&&r[k].at)list.push(d+' '+r[k].at)}
  list.sort();const p=list[list.length-1];if(!p)return'';const[pd,pt]=p.split(' ');const h=(diff(date,pd)*1440+hm(at)-hm(pt))/60;if(h<=0)return'';
  return h<i.m.gap[0]||h>i.m.gap[1]?`이번 간격 ${h.toFixed(1)}시간, 처방 간격 ${i.m.gap[0]}~${i.m.gap[1]}시간`:''}
@@ -130,7 +131,7 @@ function vToday(){const p=db.profile,t=today(),hide=p.hideGuide,g=ga(t),st=daySt
  hero+='</div>';
  const late=st.items.filter(i=>!i.rec&&i.time&&hm(nowHM())-hm(i.time)>60&&!SIM_noLate());
  if(late.length)notes.push(`<div class="note warn"><b>시간이 지난 약 ${late.length}건</b><span>이미 했다면 눌러서 기록하세요. 놓쳤다면 두 번 쓰지 말고 병원에 확인하세요.</span></div>`);
- if(t===p.trackingStart&&!SIM&&st.done<st.due)notes.push(`<div class="note info"><b>오늘이 첫날입니다</b><span>오늘 이미 한 약은 눌러서 기록하세요. 지난 날짜 기록은 달력에서 넣을 수 있습니다.</span></div>`);
+ if(t===p.trackingStart&&!SIM&&st.done<st.due)notes.push(`<div class="note info"><b>오늘이 첫날입니다</b><span>오늘 이미 한 약은 눌러서 기록하세요. 이전 날짜는 달력에서 날짜를 누른 뒤 이 날 약 기록 추가를 누르세요.</span></div>`);
  const dg=(db.days[t]||{}).sym||{};if(SYM.some(s=>s[2]&&dg[s[0]]))notes.push(`<button class="note bad" data-a="go" data-v="emergency" style="text-align:left"><b>위험 신호가 기록되었습니다</b><span>담당 병원에 바로 연락하세요. 응급 카드 열기</span></button>`);
  for(const m of db.meds){if(!active(m,t))continue;const r=remaining(m);if(r!=null&&m.slots.length&&r<=m.slots.length*3)notes.push(`<div class="note warn"><b>${esc(m.name)} ${r}회분 남음</b><span>다음 처방이나 구매를 확인하세요.</span></div>`)}
  if(calState().st==='changed')notes.push(`<button class="note warn" data-a="go" data-v="alarm" style="text-align:left"><b>약 시간이 바뀌었습니다</b><span>캘린더 알림을 다시 만들어 주세요. 눌러서 열기</span></button>`);
@@ -169,6 +170,7 @@ function vCal(){const t=today();ui.sel=ui.sel||t;ui.month=ui.month||t.slice(0,7)
  const info=[];if(syms.length)info.push(['몸 상태',esc(syms.join(', '))]);if(dd.weight)info.push(['체중',esc(dd.weight)+'kg']);if(dd.bp)info.push(['혈압',esc(dd.bp)]);if(dd.ex&&dd.ex.done)info.push(['운동',esc(dd.ex.t||'완료')+(dd.ex.min?` ${esc(dd.ex.min)}분`:'')]);if(dd.note)info.push(['메모',esc(dd.note)]);if(dd.water)info.push(['물',esc(dd.water)+'컵']);
  for(const x of labs)info.push([esc(x.name),esc(x.value)+' '+esc(x.unit||'')]);
  if(info.length)d+=`<div class="list">${info.map(([a,b])=>`<div class="li"><span class="small muted" style="width:62px;flex:none">${a}</span><span class="grow">${b}</span></div>`).join('')}</div>`;
+ const firstStart=db.meds.reduce((a,m)=>!a||m.start<a?m.start:a,'');if(s<=t&&firstStart&&s<firstStart&&ui.backfill!==s)d+=`<button class="btn sec2" data-a="backfill" data-d="${s}">이 날 약 기록 추가</button>`;
  if(s<=t)d+=`<button class="btn sec2" data-a="bodySheet" data-d="${s}">이 날 몸 상태 기록</button>`;
  d+=`<button class="btn sec2" data-a="apptSheet" data-d="${s}">이 날 일정 추가</button></section>`;
  return `<div class="stack"><div class="calh"><button class="icb" data-a="mon" data-v="-1" aria-label="이전 달">${I.back}</button><div class="m">${y}년 ${m}월</div><button class="icb" data-a="mon" data-v="1" aria-label="다음 달">${I.next}</button></div><div class="cal">${c}</div><div class="legend"><span><i class="dot f c-injection"></i>주사</span><span><i class="dot f c-oral"></i>경구약</span><span><i class="dot f c-vaginal"></i>질정</span><span><i class="dot f c-procedure"></i>시술</span><span><i class="dot f c-visit"></i>내원</span><span><i class="dot"></i>빈 원은 미완료·예정</span></div>${d}</div>`}
@@ -202,7 +204,7 @@ const photoInput=id=>`<label class="btn sec2" for="${id}">초음파 사진 넣�
 function photoSection(w){const list=photos.filter(p=>weekOf(p.date)===w).sort((a,b)=>a.date.localeCompare(b.date));return `<section class="sec"><div class="sech"><h2>우리 아기 사진</h2>${photos.length?'<button class="link" data-a="go" data-v="album">앨범 보기</button>':''}</div>${list.length?`<div class="phs">${list.map(thumb).join('')}</div>`:'<div class="small muted">이번 주 초음파 사진을 넣어두면 주차별로 모입니다. 사진은 이 폰에만 저장됩니다.</div>'}${photoInput('photoIn')}</section>`}
 function vAlbum(){const by={};for(const p of photos)(by[weekOf(p.date)]=by[weekOf(p.date)]||[]).push(p);const ks=Object.keys(by).map(Number).sort((a,b)=>b-a);return `<div class="stack">${head('초음파 앨범')}${photoInput('photoIn2')}${ks.length?ks.map(k=>`<section class="sec"><h2 style="font-size:1rem">${isNaN(k)?'날짜 기준 없음':k+'주'}</h2><div class="phs">${by[k].sort((a,b)=>a.date.localeCompare(b.date)).map(thumb).join('')}</div></section>`).join(''):'<div class="note info"><span>병원에서 받은 초음파 사진을 넣으면 주차별로 모아 볼 수 있습니다.</span></div>'}<div class="small faint">사진은 이 폰에만 저장됩니다. 사진까지 보관하려면 더보기의 백업 파일을 만들어 주세요.</div></div>`}
 async function shrink(url,max,q){const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=url});const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*k));c.height=Math.max(1,Math.round(img.height*k));c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',q)}
-async function pickPhoto(file){try{const url=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(file)});const data=await shrink(url,1400,.82),th=await shrink(url,300,.7);ui.ph={data,thumb:th};const t=today(),d=view==='guide'&&!stack.length&&ui.gw&&ui.gw!==wk(t)&&lmp()?add(lmp(),ui.gw*7):t;openSheet(`${shh('사진 저장')}<img class="phbig" src="${esc(data)}" alt="선택한 사진 미리보기">${fld('pD','촬영일','date',d)}${fld('pM','메모(선택)','text','','placeholder="아기집 확인, 심장박동 등"')}<button class="btn" data-a="photoSave">저장</button>`)}catch(e){toast('사진을 읽지 못했습니다. 다른 사진으로 다시 시도해 주세요.')}}
+async function pickPhoto(file){try{const url=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(file)});const data=await shrink(url,1400,.82),th=await shrink(url,300,.7);ui.ph={data,thumb:th};const t=today(),d=view==='guide'&&!stack.length&&ui.gw&&ui.gw!==wk(t)&&lmp()?add(lmp(),ui.gw*7):t,d2=d>t?t:d;openSheet(`${shh('사진 저장')}<img class="phbig" src="${esc(data)}" alt="선택한 사진 미리보기">${fld('pD','촬영일','date',d2,`max="${t}"`)}${fld('pM','메모(선택)','text','','placeholder="아기집 확인, 심장박동 등"')}<button class="btn" data-a="photoSave">저장</button>`)}catch(e){toast('사진을 읽지 못했습니다. 다른 사진으로 다시 시도해 주세요.')}}
 function photoView(id){const p=photos.find(x=>x.id===id);if(!p)return;const g=ga(p.date);openSheet(`${shh(fmtYMD(p.date)+(g!=null&&g>=0?' · '+fmtGA(g):''))}<img class="phbig" src="${esc(p.data)}" alt="초음파 사진">${p.memo?`<p>${esc(p.memo)}</p>`:''}<button class="btn sec2" data-a="photoDelAsk" data-id="${esc(p.id)}">사진 지우기</button>`)}
 
 /* 기록 */
@@ -304,7 +306,7 @@ function vSetup(){const u=ui.setup;
  if(u.step==='help')return `<div class="stack"><div class="row"><button class="icb" data-a="setupBack" aria-label="뒤로" style="margin-left:-10px">${I.back}</button><div class="ptitle grow">도움말</div></div>${HELP.map((s,i)=>`<details ${i===0?'open':''}><summary>${esc(s[0])}</summary><div>${s[1]}</div></details>`).join('')}</div>`;
  const s=u.seed,p=s.profile;
  return `<div class="stack"><div class="row"><button class="icb" data-a="setupBack" aria-label="뒤로" style="margin-left:-10px">${I.back}</button><div class="ptitle grow">내용 확인</div></div><div class="stack" style="gap:10px">${fld('fName','이름','text',p.name)}<div class="grid2">${fld('fTrans','배아 이식일','date',p.transferDate)}${sel('fEmb','이식한 배아',p.embryoDay||3,[[3,'3일 배아'],[5,'5일 배아'],[6,'6일 배아'],[2,'2일 배아']])}</div><div class="small muted">이식일이 없으면 시작 후 설정에서 예정일을 입력할 수 있습니다.</div></div><section class="sec"><div class="sech"><h2>약과 주사 시간</h2></div>${s.meds.length?`<div class="list">${s.meds.map((m,i)=>`<div class="li" style="flex-wrap:wrap"><span class="tag t-${m.type}">${TYPE[m.type]}</span><span class="grow"><span class="t">${esc(m.name)}</span> <span class="s">${esc(m.dose||'')}</span>${m.note?`<br><span class="s">${esc(m.note)}</span>`:''}</span><span class="row wrap" style="width:100%">${m.slots.map((x,j)=>`<input type="time" aria-label="${esc(m.name)} ${esc(x.label||'')} 시간" data-c="seedTime" data-m="${i}" data-s="${j}" value="${esc(x.time)}" style="flex:1;min-width:120px">`).join('')}</span></div>`).join('')}</div>`:'<div class="note info"><span>약은 시작 후 더보기의 처방 관리에서 추가할 수 있습니다.</span></div>'}</section><button class="btn" data-a="setupDone">시작하기</button></div>`}
-function decodeSetup(t){t=t.trim().replace(/\s+/g,'');if(!/^POOM1\./.test(t))throw new Error('code');const b=t.slice(6).replace(/-/g,'+').replace(/_/g,'/');const bin=atob(b);const u=Uint8Array.from(bin,c=>c.charCodeAt(0));return JSON.parse(new TextDecoder().decode(u))}
+function decodeSetup(t){t=t.trim().replace(/\s+/g,'');if(!/^POOM1\./.test(t))throw new Error('code');const b=t.slice(6).replace(/-/g,'+').replace(/_/g,'/');const bin=atob(b);const u=Uint8Array.from(bin,c=>c.charCodeAt(0));const o=JSON.parse(new TextDecoder().decode(u));if(!o||!o.profile||!Array.isArray(o.meds))throw new Error('code');return o}
 function emptyDb(){const t=today();return{v:1,updatedAt:0,profile:{name:'',baseMode:'transfer',transferDate:'',embryoDay:3,edd:'',lmp:'',fetus:'unknown',blood:'',rh:'',allergy:'',hospital:'',hospitalTel:'',guardian:'',guardianTel:'',birthDate:'',activity:'normal',nausea:false,hideGuide:false,fontLarge:false,theme:'system',trackingStart:t},meds:[],doses:{},days:{},labs:[],appts:[],checks:{},questions:[],kicks:[],contractions:[],lastBackup:'',calExport:null}}
 function buildDb(seed){const d=emptyDb(),t=today();Object.assign(d.profile,seed.profile||{});
  d.meds=(seed.meds||[]).map(m=>Object.assign({id:uid(),type:'oral',name:'',dose:'',note:'',start:t,end:'',stock:'',stockDate:t},m,{slots:(m.slots||[]).map(s=>Object.assign({id:uid()},s))}));
@@ -359,23 +361,24 @@ const ACT={
  zone(d){ui.site=d.v;$('#bellyBox').innerHTML=belly(ui.site,true)},
  doseSave(d){const i=findItem(d.d,d.k);if(!i)return;const inj=i.m.type==='injection'&&!i.m.noSite;if(inj&&!ui.site){toast('주사 위치를 선택해 주세요');return}
   const at=$('#dAt').value,memo=$('#dMemo').value.trim();const o={s:'done',at,memo};if(inj)o.site=ui.site;record(d.d,i,o);save();closeSheet();render();const g=gapMsg(d.d,i,at);toast(g||`${i.m.name} 기록했습니다`)},
- doseSkip(d){const i=findItem(d.d,d.k);if(!i)return;record(d.d,i,{s:'skip',at:'',memo:$('#dMemo').value.trim()});save();closeSheet();render();toast('건너뜀으로 기록했습니다')},
+ doseSkip(d){const i=findItem(d.d,d.k);if(!i)return;record(d.d,i,{s:'skip',at:'',site:undefined,memo:$('#dMemo').value.trim()});save();closeSheet();render();toast('건너뜀으로 기록했습니다')},
  doseClear(d){clearDose(d.d,d.k);save();closeSheet();render()},
  exSheet(){exSheet()},
  exView(d){exSheet(today(),d.v)},
  exDone(d){const o=dayObj(d.d),x=exToday(d.d);if(o.ex&&o.ex.done)delete o.ex;else o.ex={done:true,t:x.s.t,min:$('#exMin').value};save();closeSheet();render()},
  mealSheet(){mealSheet()},
- water(d,el){const o=dayObj(d.d);o.water=Math.max(0,(o.water||0)+Number(d.v));$('#wN').textContent=o.water;save()},
+ water(d,el){const o=dayObj(d.d);o.water=Math.max(0,(o.water||0)+Number(d.v));$('#wN').textContent=o.water;save();render()},
  bodySheet(d){bodySheet(d.d||today())},
  sym(d,el){ui.sym[d.v]=!ui.sym[d.v];el.classList.toggle('on',ui.sym[d.v]);el.setAttribute('aria-pressed',ui.sym[d.v]);symNote()},
  bodySave(){const o=dayObj(ui.symD),w=$('#bW').value.trim(),b=$('#bP').value.trim();if(b&&!/^\d{2,3}\/\d{2,3}$/.test(b)){toast('혈압은 118/76처럼 입력해 주세요');return}o.sym=ui.sym;o.weight=w;o.bp=b;o.note=$('#bN').value.trim();save();closeSheet();render()},
- pick(d){ui.sel=d.v;render()},
+ pick(d){ui.sel=d.v;ui.backfill=null;render()},
+ backfill(d){ui.backfill=d.d;render()},
  mon(d){const[y,m]=ui.month.split('-').map(Number),x=new Date(y,m-1+Number(d.v),1,12);ui.month=toStr(x).slice(0,7);render()},
  gTab(d){ui.guide=d.v;render()},
  gw(d){ui.gw=clampW(ui.gw+Number(d.v));render()},
  lTab(d){ui.log=d.v;render()},
  labSheet(d){labSheet(d.id)},
- labSave(d){const v=$('#lV').value.trim(),n=$('#lN').value.trim(),dt=$('#lD').value;if(!v||!n||!dt){toast('검사일, 항목, 수치를 입력해 주세요');return}const o={date:dt,name:n,value:v,unit:$('#lU').value.trim(),note:$('#lM').value.trim()};if(d.id)Object.assign(db.labs.find(l=>l.id===d.id),o);else db.labs.push(Object.assign({id:uid()},o));save();closeSheet();render()},
+ labSave(d){const v=$('#lV').value.trim().replace(/,/g,''),n=$('#lN').value.trim(),dt=$('#lD').value;if(!v||!n||!dt){toast('검사일, 항목, 수치를 입력해 주세요');return}const o={date:dt,name:n,value:v,unit:$('#lU').value.trim(),note:$('#lM').value.trim()};if(d.id)Object.assign(db.labs.find(l=>l.id===d.id),o);else db.labs.push(Object.assign({id:uid()},o));save();closeSheet();render()},
  labDel(d){db.labs=db.labs.filter(l=>l.id!==d.id);save();closeSheet();render()},
  apptSheet(d){apptSheet(d.id,d.d)},
  apptSave(d){const t=$('#aT').value.trim(),dt=$('#aD').value;if(!t||!dt){toast('내용과 날짜를 입력해 주세요');return}const o={date:dt,time:$('#aH').value,kind:$('#aK').value,title:t,note:$('#aN').value.trim()};if(d.id)Object.assign(db.appts.find(a=>a.id===d.id),o);else db.appts.push(Object.assign({id:uid()},o));save();closeSheet();render()},
@@ -389,12 +392,12 @@ const ACT={
  medSheet(d){medSheet(d.id)},
  slotAdd(){ui.ms.push({id:uid(),label:'',time:'20:00'});$('#mSlots').innerHTML=medSlots()},
  slotDel(d){ui.ms.splice(Number(d.v),1);$('#mSlots').innerHTML=medSlots()},
- medSave(d){const name=$('#mN').value.trim();if(!name){toast('이름을 입력해 주세요');return}if(!ui.ms.length){toast('시간을 하나 이상 넣어 주세요');return}const t=today(),g0=$('#mG0').value,g1=$('#mG1').value,st=$('#mS').value,o={type:$('#mT').value,name,dose:$('#mD').value.trim(),note:$('#mNo').value.trim(),slots:ui.ms,gap:g0&&g1?[Number(g0),Number(g1)]:null,end:$('#mE').value,stock:st===''?'':Number(st),stockDate:t};
+ medSave(d){const name=$('#mN').value.trim();if(!name){toast('이름을 입력해 주세요');return}if(!ui.ms.length||ui.ms.some(x=>!x.time)){toast('시간을 모두 입력해 주세요');return}const t=today(),g0=$('#mG0').value,g1=$('#mG1').value,st=$('#mS').value,o={type:$('#mT').value,name,dose:$('#mD').value.trim(),note:$('#mNo').value.trim(),slots:ui.ms,gap:g0&&g1?[Number(g0),Number(g1)]:null,end:$('#mE').value};let tgt;
   if(d.id){const m=db.meds.find(x=>x.id===d.id),changed=['name','dose','type'].some(k=>m[k]!==o[k])||JSON.stringify(m.slots.map(s=>s.time))!==JSON.stringify(o.slots.map(s=>s.time));const past=Object.keys(db.doses).some(dt=>dt<t&&Object.keys(db.doses[dt]).some(k=>k.startsWith(m.id+'|')));
-   if(changed&&(past||m.start<t)){const nid=uid(),nm=Object.assign({},m,o,{id:nid,start:t});m.end=add(t,-1);const r=db.doses[t]||{};for(const k of Object.keys(r))if(k.startsWith(m.id+'|')){const nk=nid+'|'+k.split('|')[1];if(o.slots.some(s=>s.id===k.split('|')[1])){r[nk]=r[k];delete r[k]}}db.meds.push(nm)}else Object.assign(m,o)}
-  else db.meds.push(Object.assign({id:uid(),start:t},o));save();closeSheet();render();toast(calState().st==='changed'?'약 시간이 바뀌었습니다. 캘린더 알림을 다시 만들어 주세요.':'처방을 저장했습니다')},
+   if(changed&&(past||m.start<t)){const nid=uid(),nm=Object.assign({},m,o,{id:nid,start:t});m.end=add(t,-1);const r=db.doses[t]||{};for(const k of Object.keys(r))if(k.startsWith(m.id+'|')){const nk=nid+'|'+k.split('|')[1];if(o.slots.some(s=>s.id===k.split('|')[1])){r[nk]=r[k];delete r[k]}}db.meds.push(nm);tgt=nm}else{Object.assign(m,o);tgt=m}}
+  else{tgt=Object.assign({id:uid(),start:t,stock:'',stockDate:t},o);db.meds.push(tgt)}if(st===''){tgt.stock=''}else{tgt.stock=Number(st)+usedOn(tgt,t);tgt.stockDate=t}save();closeSheet();render();toast(calState().st==='changed'?'약 시간이 바뀌었습니다. 캘린더 알림을 다시 만들어 주세요.':'처방을 저장했습니다')},
  medEnd(d){const m=db.meds.find(x=>x.id===d.id);m.end=today();save();closeSheet();render();toast('오늘까지 사용으로 저장했습니다')},
- async photoSave(){const dt=$('#pD').value;if(!dt){toast('촬영일을 입력해 주세요');return}const p={id:uid(),date:dt,memo:$('#pM').value.trim(),data:ui.ph.data,thumb:ui.ph.thumb};try{await Store.photoPut(p);photos.push(p);ui.ph=null;closeSheet();render();toast('사진을 저장했습니다')}catch(e){toast('사진을 저장하지 못했습니다. 폰 저장 공간을 확인해 주세요.')}},
+ async photoSave(){const dt=$('#pD').value;if(!dt||dt>today()){toast('촬영일을 오늘 이전 날짜로 입력해 주세요');return}const p={id:uid(),date:dt,memo:$('#pM').value.trim(),data:ui.ph.data,thumb:ui.ph.thumb};try{await Store.photoPut(p);photos.push(p);ui.ph=null;closeSheet();render();toast('사진을 저장했습니다')}catch(e){toast('사진을 저장하지 못했습니다. 폰 저장 공간을 확인해 주세요.')}},
  photoView(d){photoView(d.id)},
  photoDelAsk(d){closeSheet();ui.delPhoto=d.id;askSheet('사진을 지울까요?','이 폰에서 사진이 지워집니다. 백업이 없으면 되돌릴 수 없습니다.','photoDelGo','지우기')},
  async photoDelGo(){await Store.photoDel(ui.delPhoto);photos=photos.filter(p=>p.id!==ui.delPhoto);closeSheet();render();toast('사진을 지웠습니다')},
@@ -407,19 +410,20 @@ const ACT={
  async exportFile(){const data=JSON.stringify(Object.assign({},db,{photoData:photos})),name=`poom-backup-${today()}.json`,f=new File([data],name,{type:'application/json'});try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'품 백업'})}else{const u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000)}db.lastBackup=today();await save();render();toast('백업 파일을 만들었습니다')}catch(e){if(e&&e.name!=='AbortError')toast('파일을 만들지 못했습니다. 백업 내용 복사를 이용하세요.')}},
  exportCopy(){db.lastBackup=today();save();copyText(JSON.stringify(db),$('#bkOut'))},
  async restoreAsk(){let t=$('#bkText').value.trim();const f=$('#bkFile').files[0];if(f)t=await f.text();if(!t){toast('백업 파일을 고르거나 내용을 붙여넣어 주세요');return}try{const o=JSON.parse(t);if(!o||!o.profile||!Array.isArray(o.meds)||!o.doses)throw 0;ui.pending=o;askSheet('복원할까요?',`${o.updatedAt?new Date(o.updatedAt).toLocaleDateString('ko-KR')+' 기록으로 ':''}지금 폰의 기록을 바꿉니다.`,'restoreGo','복원')}catch(e){toast('백업 형식이 맞지 않습니다. 파일을 다시 확인해 주세요.')}},
- async restoreGo(){const pd=ui.pending.photoData;delete ui.pending.photoData;db=Object.assign(emptyDb(),ui.pending);await save();if(Array.isArray(pd)){const ok=pd.filter(p=>p&&typeof p.id==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(p.date||'')&&/^data:image\//.test(p.data||'')&&/^data:image\//.test(p.thumb||''));await Store.photoClear();for(const p of ok)await Store.photoPut(p);photos=ok}closeSheet();stack=[];view='today';render();toast('복원했습니다')},
- saveSettings(){const p=db.profile,v=id=>{const e=$('#'+id);return e?e.value:undefined},set=(k,id)=>{const x=v(id);if(x!==undefined)p[k]=x};set('name','sName');const nb=v('sBase');set('transferDate','sTrans');set('embryoDay','sEmb');set('edd','sEdd');set('lmp','sLmp');set('fetus','sFetus');set('birthDate','sBirth');set('blood','sBlood');set('rh','sRh');set('allergy','sAllergy');set('hospital','sHosp');set('hospitalTel','sHospT');set('guardian','sGuard');set('guardianTel','sGuardT');set('activity','sAct');set('theme','sTheme');p.nausea=$('#sNausea').checked;p.hideGuide=$('#sHide').checked;p.fontLarge=$('#sLarge').checked;p.baseMode=nb;ui.gw=null;applyPrefs();save();render();toast('저장했습니다')},
+ async restoreGo(){const pd=ui.pending.photoData;delete ui.pending.photoData;db=Object.assign(emptyDb(),ui.pending);migrate();await save();if(Array.isArray(pd)){const ok=pd.filter(p=>p&&typeof p.id==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(p.date||'')&&/^data:image\//.test(p.data||'')&&/^data:image\//.test(p.thumb||''));await Store.photoClear();for(const p of ok)await Store.photoPut(p);photos=ok}applyPrefs();ui.sel=null;ui.month=null;ui.gw=null;closeSheet();stack=[];view='today';render();toast('복원했습니다')},
+ collectSettings(){const p=db.profile,v=id=>{const e=$('#'+id);return e?e.value:undefined},set=(k,id)=>{const x=v(id);if(x!==undefined)p[k]=x};set('name','sName');const nb=v('sBase');set('transferDate','sTrans');set('embryoDay','sEmb');set('edd','sEdd');set('lmp','sLmp');set('fetus','sFetus');set('birthDate','sBirth');set('blood','sBlood');set('rh','sRh');set('allergy','sAllergy');set('hospital','sHosp');set('hospitalTel','sHospT');set('guardian','sGuard');set('guardianTel','sGuardT');set('activity','sAct');set('theme','sTheme');p.nausea=$('#sNausea').checked;p.hideGuide=$('#sHide').checked;p.fontLarge=$('#sLarge').checked;p.baseMode=nb;ui.gw=null},
+ saveSettings(){ACT.collectSettings();applyPrefs();save();render();toast('저장했습니다')},
  wipeAsk(){askSheet('모든 기록을 지울까요?','약 기록, 달력, 수치, 설정이 이 폰에서 모두 사라집니다. 먼저 백업하세요. 되돌릴 수 없습니다.','wipeGo','모두 지우기')},
  async wipeGo(){await Store.clear();photos=[];db=null;closeSheet();stack=[];view='today';ui.setup={step:'start'};if(SIM){await simReset();return}render()},
  async codeGo(){const t=$('#code').value;if(!t.trim()){toast('설정 코드를 붙여넣어 주세요');return}try{ui.setup={step:'confirm',seed:decodeSetup(t)};render();scrollTo(0,0)}catch(e){toast('설정 코드를 읽지 못했습니다. 끊기지 않게 전체를 붙여넣어 주세요.')}},
  manualGo(){ui.setup={step:'confirm',seed:{profile:{name:'',baseMode:'transfer',transferDate:'',embryoDay:3},meds:[]}};render()},
  helpFirst(){ui.setup={step:'help'};render();scrollTo(0,0)},
  setupBack(){ui.setup={step:'start'};render()},
- async setupDone(){const s=ui.setup.seed;s.profile.name=$('#fName').value.trim();s.profile.transferDate=$('#fTrans').value;s.profile.embryoDay=Number($('#fEmb').value);db=buildDb(s);await save();try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}applyPrefs();view='today';render();scrollTo(0,0);toast('시작했습니다')},
+ async setupDone(){const s=ui.setup.seed;if(s.meds.some(m=>m.slots.some(x=>!x.time))){toast('약 시간을 모두 입력해 주세요');return}s.profile.name=$('#fName').value.trim();s.profile.transferDate=$('#fTrans').value;s.profile.embryoDay=Number($('#fEmb').value);db=buildDb(s);await save();try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}applyPrefs();view='today';render();scrollTo(0,0);toast('시작했습니다')},
  async pwaInstall(){const p=window.__bip;if(p){p.prompt();await p.userChoice;window.__bip=null;render()}}
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el)return;const a=ACT[el.dataset.a];if(a){if(el.dataset.a==='scrim'&&e.target!==el)return;a(el.dataset,el,e)}});
-document.addEventListener('change',e=>{const c=e.target.dataset&&e.target.dataset.c;if(!c)return;const v=e.target.dataset.v;
+document.addEventListener('change',e=>{if(e.target.id==='sBase'){ACT.collectSettings();render();return}const c=e.target.dataset&&e.target.dataset.c;if(!c)return;const v=e.target.dataset.v;
  if(c==='photo'){const f=e.target.files&&e.target.files[0];e.target.value='';if(f)pickPhoto(f);return}
  if(c==='calCleared'){const on=e.target.checked,b=$('#calSendBtn'),l=$('#calSafari');if(b)b.disabled=!on;if(l)l.hidden=!on}
  if(c==='ms'){db.checks[v]=e.target.checked;save()}
@@ -429,11 +433,11 @@ document.addEventListener('change',e=>{const c=e.target.dataset&&e.target.datase
  if(c==='slotL')ui.ms[Number(v)].label=e.target.value;
  if(c==='slotT')ui.ms[Number(v)].time=e.target.value;
  if(c==='seedTime')ui.setup.seed.meds[Number(e.target.dataset.m)].slots[Number(e.target.dataset.s)].time=e.target.value;
- if(e.target.id==='sBase'){db.profile.baseMode=e.target.value;render()}});
+});
 window.addEventListener('popstate',()=>{navArmed=false;if(sheetOpen)closeSheet(true);else if(stack.length){stack.pop();render()}if(sheetOpen||stack.length)pushNav()});
 
 /* 화면 */
-function applyPrefs(){if(!db)return;const p=db.profile;document.body.classList.toggle('large',!!p.fontLarge);if(!SIM){if(p.theme==='system')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',p.theme)}}
+function applyPrefs(){if(!db)return;const p=db.profile;document.documentElement.classList.toggle('large',!!p.fontLarge);if(!SIM){if(p.theme==='system')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',p.theme)}}
 function render(){const root=$('#root'),nav=$('#nav');lastDay=today();
  if(ui.calPage){root.innerHTML=vCalPage();nav.innerHTML='';return}
  if(window.__simBar)window.__simBar();
@@ -446,9 +450,10 @@ function render(){const root=$('#root'),nav=$('#nav');lastDay=today();
  nav.innerHTML=`<div>${tabs.map(([k,l,i])=>`<button class="${view===k?'on':''}" data-a="tab" data-v="${k}" ${view===k?'aria-current="page"':''}>${i}${l}</button>`).join('')}</div>`}
 setInterval(()=>{if(db&&!sheetOpen&&!document.activeElement.matches('input,textarea,select')&&view==='today'&&!stack.length)render()},60000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&db&&!sheetOpen&&lastDay!==today()){ui.sel=null;ui.month=null;ui.gw=null;render()}});
+function migrate(){['voucher','mompyeon','hc','worktime','checkup','matleave','highrisk','doula','firstmeet','parentpay'].forEach((id,i)=>{if(db.checks['sup'+i]){db.checks['s_'+id]=true;delete db.checks['sup'+i]}})}
 async function boot(){if(SIM){await window.__simBoot();return}
  const cm=location.hash.match(/^#cal=(\d{4}(?:,\d{4}){0,23})$/);if(cm){ui.calPage=cm[1].split(',').map(x=>x.slice(0,2)+':'+x.slice(2)).filter(x=>/^([01]\d|2[0-3]):[0-5]\d$/.test(x));if(ui.calPage.length){render();return}ui.calPage=null}
- db=await Store.get();photos=await Store.photoAll();if(db){db=Object.assign(emptyDb(),db);['voucher','mompyeon','hc','worktime','checkup','matleave','highrisk','doula','firstmeet','parentpay'].forEach((id,i)=>{if(db.checks['sup'+i]){db.checks['s_'+id]=true;delete db.checks['sup'+i]}});applyPrefs()}render();
+ db=await Store.get();photos=await Store.photoAll();if(db){db=Object.assign(emptyDb(),db);migrate();applyPrefs()}render();
  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window.__bip=e;if(!db)render()});
  if('serviceWorker'in navigator){try{const r=await navigator.serviceWorker.register('./sw.js');r.addEventListener('updatefound',()=>{const n=r.installing;if(n)n.addEventListener('statechange',()=>{if(n.state==='installed'&&navigator.serviceWorker.controller)toast('새 버전이 준비되었습니다. 앱을 다시 열면 적용됩니다.')})})}catch(e){}}
  try{if(db&&navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}}

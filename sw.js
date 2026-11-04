@@ -1,4 +1,4 @@
-const B='4443c2c7',V='poom-'+B;
+const B='f21c76d5',V='poom-'+B;
 const FILES=['./','./index.html','./style.css','./content.js','./app.js','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil((async()=>{const c=await caches.open(V);await Promise.all(FILES.map(async f=>{const r=await fetch(new Request(f+'?v='+B,{cache:'reload'}));if(!r.ok)throw new Error('precache '+f);await c.put(new URL(f,location.href).href,r)}));await self.skipWaiting()})())});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==V).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});

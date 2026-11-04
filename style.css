@@ -8,7 +8,7 @@
  --warn:#9A4A10;--warn-s:#FBE9DA;--bad:#AD2A22;--bad-s:#FBE3E0;--good:#1B6E4B;
  --f:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic","Segoe UI",sans-serif;
  --d:"PoomSerif","Apple SD Gothic Neo","Noto Serif KR",serif;
- --fs:16px;--nav:62px;
+ --fs:1rem;--nav:62px;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
  --bg:#0F1A18;--sf:#172522;--sf2:#20302C;--ink:#E6F0EC;--ink2:#A9BDB6;--ink3:#8DA39B;--line:#2C3E39;
@@ -25,7 +25,7 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 var(--fs)/1.5 var(--f);word-break:keep-all;overflow-wrap:anywhere}
-body.large{--fs:18.5px}
+html.large{font-size:115%}
 button,input,select,textarea{font:inherit;color:inherit}
 button{background:none;border:0;padding:0;cursor:pointer}
 a{color:var(--acc)}
