@@ -5,7 +5,7 @@
  --acc:#17594E;--on:#FFFFFF;--acc-soft:#DCEBE5;
  --inj:#BE3F6F;--inj-s:#F8E1EA;--oral:#1F7F71;--oral-s:#D9F0EB;--vag:#2F62B5;--vag-s:#DFE9F8;
  --proc:#6E4FC4;--proc-s:#E9E3F9;--visit:#8F6A00;--visit-s:#F7EBC6;--supp:#7A5A2E;--supp-s:#F0E5D3;
- --warn:#9A4A10;--warn-s:#FBE9DA;--bad:#AD2A22;--bad-s:#FBE3E0;--good:#1B6E4B;
+ --warn:#9A4A10;--warn-s:#FBE9DA;--bad:#AD2A22;--bad-s:#FBE3E0;--sat:#1D5FBF;--good:#1B6E4B;
  --f:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic","Segoe UI",sans-serif;
  --d:"PoomSerif","Apple SD Gothic Neo","Noto Serif KR",serif;
  --fs:1rem;--nav:62px;
@@ -15,13 +15,13 @@
  --acc:#7FD0BE;--on:#0D211D;--acc-soft:#1F3B35;
  --inj:#F08DB0;--inj-s:#43202E;--oral:#6FD3C2;--oral-s:#173B35;--vag:#8DB4F0;--vag-s:#1E2F4C;
  --proc:#BBA6F2;--proc-s:#2F2650;--visit:#E9C766;--visit-s:#3D3213;--supp:#D9BC8E;--supp-s:#3A2F1E;
- --warn:#F0B283;--warn-s:#402A18;--bad:#F2A49D;--bad-s:#46201D;--good:#7FD6AE;color-scheme:dark}}
+ --warn:#F0B283;--warn-s:#402A18;--bad:#F2A49D;--bad-s:#46201D;--sat:#8FB8F5;--good:#7FD6AE;color-scheme:dark}}
 :root[data-theme="dark"]{
  --bg:#0F1A18;--sf:#172522;--sf2:#20302C;--ink:#E6F0EC;--ink2:#A9BDB6;--ink3:#8DA39B;--line:#2C3E39;
  --acc:#7FD0BE;--on:#0D211D;--acc-soft:#1F3B35;
  --inj:#F08DB0;--inj-s:#43202E;--oral:#6FD3C2;--oral-s:#173B35;--vag:#8DB4F0;--vag-s:#1E2F4C;
  --proc:#BBA6F2;--proc-s:#2F2650;--visit:#E9C766;--visit-s:#3D3213;--supp:#D9BC8E;--supp-s:#3A2F1E;
- --warn:#F0B283;--warn-s:#402A18;--bad:#F2A49D;--bad-s:#46201D;--good:#7FD6AE;color-scheme:dark}
+ --warn:#F0B283;--warn-s:#402A18;--bad:#F2A49D;--bad-s:#46201D;--sat:#8FB8F5;--good:#7FD6AE;color-scheme:dark}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 var(--fs)/1.5 var(--f);word-break:keep-all;overflow-wrap:anywhere}
@@ -88,7 +88,7 @@ li+li{margin-top:.28em}
 .icb:active{background:var(--sf2)}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
 .cal .wd{text-align:center;font-size:.75rem;color:var(--ink2);padding:3px 0}
-.cal .wd.sun{color:var(--bad)}
+.cal .wd.sun,.cell.sun .d{color:var(--bad)}.cal .wd.sat,.cell.sat .d{color:var(--sat)}
 .cell{min-height:56px;border-radius:9px;padding:4px 1px 3px;display:flex;flex-direction:column;align-items:center;gap:2px}
 .cell .d{font-size:.92rem;font-variant-numeric:tabular-nums;line-height:1.35}
 .cell.other{visibility:hidden}
