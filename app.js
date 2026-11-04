@@ -1,5 +1,5 @@
 'use strict';
-const SIM=!!window.POOM_SIM, NS=SIM?'poom-sim':'poom', VERSION='1.1.0', BUILD='040a9d55', KEY=NS+'.db';
+const SIM=!!window.POOM_SIM, NS=SIM?'poom-sim':'poom', VERSION='1.1.0', BUILD='211e079a', KEY=NS+'.db';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
@@ -194,7 +194,7 @@ function vGuide(){const t=today();ui.gw=ui.gw||clampW(wk(t));if(!lmp())return `<
  const tab=ui.guide;let b='';
  if(tab==='week'){const w=ui.gw,x=WEEKS[w],l=lmp(),a=add(l,w*7),e=add(a,6),mn=MULTI_NOTES.find(n=>w>=n[0]&&w<=n[1]);
   b=`<div class="weekbar"><button class="icb" data-a="gw" data-v="-1" aria-label="이전 주">${I.back}</button><div class="grow" style="text-align:center"><div class="w">${w}주${w===wk(t)?' <span class="small muted">이번 주</span>':''}</div><div class="small muted num">${fmtMD(a)}~${fmtMD(e)}</div></div><button class="icb" data-a="gw" data-v="1" aria-label="다음 주">${I.next}</button></div>
-  <h2 style="font:700 1.25rem/1.3 var(--d)">${esc(x.head)}</h2><div class="artrow">${artSvg(w)}<div class="grow"><div class="small muted">아기 크기(대략)</div><div class="t">${esc(x.baby)}</div><div class="small muted">${esc((ART_STAGES.find(k=>w<=k.to)||ART_STAGES[7]).cap)}</div></div></div>${sizeScale(w)}<div class="small faint">그림은 이해를 돕는 단순한 표현이며 실제 모습과 다릅니다. 길이는 19주까지 머리부터 엉덩이, 20주부터 머리부터 발까지입니다.</div><div class="prose">${lst('c','확인할 일',x.check)}${lst('g','고려할 점',x.consider)}${lst('w','주의할 점',x.caution)}</div>`;
+  <h2 style="font:700 1.25rem/1.3 var(--d)">${esc(x.head)}</h2><div class="artrow">${artSvg(w)}<div class="grow"><div class="small muted">아기 크기(대략)</div><div class="t">${esc(x.baby)}</div><div class="small muted artnote">${esc(ART_NOTE[w]||'')}</div></div></div>${sizeScale(w)}<div class="small faint">그림은 발달 순서를 보여주는 단순한 표현이며 실제 모습이나 크기 비율과 다릅니다. 초기 그림은 크게 확대했고, 자세와 내용은 아기마다 다를 수 있습니다. 길이는 19주까지 머리부터 엉덩이, 20주부터 머리부터 발까지입니다.</div><div class="prose">${lst('c','확인할 일',x.check)}${lst('g','고려할 점',x.consider)}${lst('w','주의할 점',x.caution)}</div>`;
   if(mn&&Number(db.profile.fetus)!==1)b+=`<div class="note info"><b>다태 임신이라면</b><span>${esc(mn[2])}</span></div>`;
   b+=photoSection(w);
   b+=`<div class="small faint">주수는 입력한 기준으로 계산합니다. 병원 안내가 다르면 병원을 따르세요.</div>`}

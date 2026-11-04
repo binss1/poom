@@ -289,6 +289,9 @@ const RED = {
 const INJECT_GUIDE = ['손을 씻고 편하게 앉거나 눕습니다','배꼽에서 5cm 이상 떨어진 부위를 고릅니다. 직전과 반대쪽이 좋습니다','알코올 솜으로 닦고 마를 때까지 기다립니다','처방된 전량을 주사할 때는 주사기 공기방울을 빼지 않습니다','엄지와 검지로 피부를 잡고 바늘을 수직으로 끝까지 넣습니다','약을 다 넣은 뒤 바늘을 빼고 피부를 놓습니다','문지르지 않습니다. 출혈이 있으면 가볍게 누릅니다','바늘은 전용 용기에 버립니다','멍, 흉터, 단단한 곳은 피합니다'];
 
 const SOURCES = [
+ ['Mayo Clinic 태아 발달: 임신 초기','https://www.mayoclinic.org/healthy-lifestyle/pregnancy-week-by-week/in-depth/prenatal-care/art-20045302'],
+ ['Mayo Clinic 태아 발달: 임신 중기','https://www.mayoclinic.org/healthy-lifestyle/pregnancy-week-by-week/in-depth/fetal-development/art-20046151'],
+ ['Mayo Clinic 태아 발달: 임신 후기','https://www.mayoclinic.org/healthy-lifestyle/pregnancy-week-by-week/in-depth/art-20045997?p=1&pg=1'],
  ['ACOG Committee Opinion 804: 임신·산후 운동','https://opqic.org/acog-committee-opinion-no-804-physical-activity-and-exercise-during-pregnancy-and-the-postpartum-period/'],
  ['2025 한국인 영양소 섭취기준 요약본','https://health.seoulmc.or.kr/uploadFiles/2025_%ED%95%9C%EA%B5%AD%EC%9D%B8%EC%98%81%EC%96%91%EC%86%8C%EC%84%AD%EC%B7%A8%EA%B8%B0%EC%A4%80_%ED%99%9C%EC%9A%A9.pdf'],
  ['질병관리청 국가건강정보포털: 임산부 식이영양','https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=5214'],
@@ -307,7 +310,7 @@ const HELP = [
  ['처방 일정 관리',`<p>더보기의 처방 관리에서 약을 추가하거나 눌러서 수정합니다.</p><p><b>시작일</b><br>새 약은 시작일을 고릅니다. 앞으로의 날짜를 넣으면 시작 예정에 표시되고, 그날부터 오늘 화면과 달력에 나타납니다.</p><p><b>요일과 격일</b><br>반복에서 요일 지정을 고르면 월·목처럼 원하는 요일만 쓸 수 있습니다. 격일·며칠마다를 고르고 2를 넣으면 시작일부터 이틀에 한 번입니다. 화면 아래 다음 일정으로 날짜를 확인하세요.</p><p><b>용량이나 시간 변경</b><br>이미 기록이 있는 약은 변경 적용일을 넣습니다. 그 전날까지는 기존 처방, 그날부터는 새 처방으로 나뉘고 지난 기록은 그대로 남습니다.</p><p><b>감량 예시</b><br>2개를 11월 20일까지, 1개를 11월 21일부터 쓴다면 약을 눌러 용량을 1개로 바꾸고 변경 적용일을 11월 21일로 넣습니다. 한 단계 더 있으면 시작 예정 처방에 마지막 날을 넣고, 약 또는 주사 추가로 다음 단계를 시작일과 함께 넣습니다.</p><p class="small muted">시작 전 처방은 시작 전 처방 지우기로 취소할 수 있습니다. 처방 내용은 병원 지시를 따르세요.</p>`],
  ['주사 위치',`<p>주사의 동그라미를 누르면 복부 지도가 열립니다. 왼쪽과 오른쪽을 위, 가운데, 아래로 나눈 6곳 중 한 곳을 고르고 저장합니다.</p><p>점선 칸이 추천 위치입니다. 직전 주사의 반대쪽에서 가장 오래 쉰 곳을 고릅니다. 멍이 있으면 다른 칸을 고르세요.</p><p>배가 커지면 위치를 어떻게 옮길지 병원에 확인하세요.</p>`],
  ['달력',`<p>날짜 아래 점은 약 종류입니다. 꽉 찬 점은 그날 완료, 빈 원은 미완료 또는 앞으로의 예정입니다. 앞으로의 날짜는 처방의 시작일부터 마지막 날까지, 요일과 격일 설정에 맞게 표시됩니다. 마지막 날이 없는 약은 출산 예정일까지 표시됩니다. 날짜를 누르면 아래에 그날의 약, 주사 위치, 증상, 수치가 나옵니다.</p><p>진료나 시술 날짜는 날짜를 누른 뒤 이 날 일정 추가로 넣습니다.</p>`],
- ['주차, 운동, 식단',`<p>이식일과 배아 일수로 주수를 계산합니다. 병원이 예정일을 알려주면 설정에서 임신 기준을 출산 예정일로 바꾸세요.</p><p>초음파에서 아기 수를 들으면 설정에 입력합니다. 다태 안내가 함께 바뀝니다.</p><p>병원에서 운동을 제한했다면 설정의 운동 지시를 바꾸세요. 운동 추천이 호흡과 휴식으로 바뀝니다.</p>`],
+ ['주차, 운동, 식단',`<p>주차별 화면에는 그 주의 아기 그림과 이번 주 달라진 점이 나옵니다. 그림은 발달 순서를 보여주는 단순한 표현이며 실제 모습이나 크기 비율과 다릅니다.</p><p>이식일과 배아 일수로 주수를 계산합니다. 병원이 예정일을 알려주면 설정에서 임신 기준을 출산 예정일로 바꾸세요.</p><p>초음파에서 아기 수를 들으면 설정에 입력합니다. 다태 안내가 함께 바뀝니다.</p><p>병원에서 운동을 제한했다면 설정의 운동 지시를 바꾸세요. 운동 추천이 호흡과 휴식으로 바뀝니다.</p>`],
  ['초음파 사진',`<p>주차 탭의 주차별 화면이나 더보기의 초음파 앨범에서 초음파 사진 넣기를 누릅니다. 사진을 고르고 촬영일을 확인한 뒤 저장하면 해당 주차에 모입니다.</p><p>사진을 누르면 크게 볼 수 있고, 메모와 삭제도 그 화면에서 합니다. 달력에서 촬영한 날짜를 눌러도 볼 수 있습니다.</p><p class="small muted">사진은 이 폰에만 저장되고 서버로 보내지 않습니다. 사진을 보존하려면 백업 파일을 만들어 주세요. 주차 안내 숨기기를 켜면 사진도 화면에서 숨겨집니다.</p>`],
  ['기록 탭',`<p>hCG 같은 검사 수치, 체중, 혈압, 증상, 병원에 물어볼 질문, 태동, 진통 간격을 기록합니다.</p><p>태동과 진통을 재는 중에 앱이 닫혀도 다시 열면 이어집니다. 오늘 화면의 측정 중 표시를 누르면 바로 돌아갑니다. 앱이 오래 닫혀 있었다면 저장하거나 취소를 누르세요.</p><p>더보기의 진료 요약은 최근 14일의 기록을 정리합니다. 진료실에서 보여주거나 복사해서 쓰세요.</p>`],
  ['응급 카드',`<p>더보기의 응급 카드에는 주수, 현재 약, 마지막 주사 시각, 연락처가 모입니다. 항응고 주사를 쓰면 마지막 주사 시각이 의료진에게 중요합니다.</p><p>설정에서 혈액형, 병원 전화, 보호자 전화를 입력해 두세요.</p>`],
@@ -319,26 +322,105 @@ const HELP = [
  ['안전 안내',`<p>품은 의료기기가 아니며 진단이나 처방을 하지 않습니다. 약의 용량, 시작, 중단은 담당 의료진이 정합니다. 위험 신호가 있으면 앱 기록보다 병원 연락이 먼저입니다.</p>`]
 ];
 
-/* 주차 일러스트: 사실 묘사가 아닌 이해를 돕는 단순 그림 */
+/* 주차 일러스트: 발달 순서를 보여주는 단순화한 그림. 실제 모습이나 실제 크기 비율이 아님 */
 const ART_STAGES=[
- {to:5,k:'sac',cap:'아기집이 자궁 안에 자리 잡는 시기'},
- {to:7,k:'bud',cap:'작은 몸과 난황이 보이는 시기'},
- {to:9,k:'early',cap:'머리와 팔다리 싹이 자라는 시기'},
- {to:13,k:'f1',cap:'사람의 모습을 갖춰가는 시기'},
- {to:19,k:'f2',cap:'몸이 길어지고 움직임이 늘어나는 시기'},
- {to:27,k:'f3',cap:'몸이 커지고 태동이 뚜렷해지는 시기'},
- {to:33,k:'f4',cap:'살이 붙고 공간이 좁아지는 시기'},
- {to:42,k:'f5',cap:'머리가 아래로 향하는 경우가 많은 시기'}
+ {to:5,cap:'아기집이 자궁 안에 자리 잡는 시기'},
+ {to:7,cap:'작은 몸과 난황이 보이는 시기'},
+ {to:9,cap:'머리와 팔다리 싹이 자라는 시기'},
+ {to:13,cap:'사람의 모습을 갖춰가는 시기'},
+ {to:19,cap:'몸이 길어지고 움직임이 늘어나는 시기'},
+ {to:27,cap:'몸이 커지고 태동이 뚜렷해지는 시기'},
+ {to:33,cap:'살이 붙고 공간이 좁아지는 시기'},
+ {to:42,cap:'머리가 아래로 향하는 경우가 많은 시기'}
 ];
-function fetusBody(o){const b='var(--art-body)',s='var(--art-shade)',i='var(--art-ink)';
- return `<g transform="translate(${o.x} ${o.y}) rotate(${o.r}) scale(${o.s})"><path d="M26 36C50 34 58 6 34 -2" fill="none" stroke="${s}" stroke-width="13" stroke-linecap="round"/><path d="M-16 -16C-36 4 -30 42 2 54C32 62 46 30 38 6C32 -14 8 -30 -16 -16Z" fill="${b}"/><circle cx="-12" cy="${-30-o.h*.42}" r="${o.h}" fill="${b}"/><path d="M-6 ${-30-o.h*.42}c5 -3 9 2 5 7" fill="none" stroke="${s}" stroke-width="2.6" stroke-linecap="round"/><path d="M${-16-o.h*.62} ${-32-o.h*.42}q5 4 10 0" fill="none" stroke="${i}" stroke-width="2.4" stroke-linecap="round"/><path d="M-6 -4C-24 8 -36 2 -38 -12" fill="none" stroke="${s}" stroke-width="9.5" stroke-linecap="round"/><circle cx="-38" cy="-15" r="6.4" fill="${s}"/><path d="M24 46C2 54 -22 46 -26 28" fill="none" stroke="${s}" stroke-width="12.5" stroke-linecap="round"/><ellipse cx="-30" cy="23" rx="10" ry="6.2" transform="rotate(-24 -30 23)" fill="${s}"/></g>`}
-function artSvg(w){const a=ART_STAGES.find(x=>w<=x.to)||ART_STAGES[7],b='var(--art-body)',s='var(--art-shade)',ring='var(--art-ring)';let c='';
- if(a.k==='sac')c=`<circle cx="4" cy="4" r="44" fill="var(--art-sac)" stroke="${ring}" stroke-width="2.5"/><circle cx="-12" cy="16" r="4.6" fill="${s}"/>`;
- if(a.k==='bud')c=`<circle cx="0" cy="2" r="58" fill="var(--art-sac)" stroke="${ring}" stroke-width="2.5"/><circle cx="-27" cy="24" r="10" fill="none" stroke="${s}" stroke-width="3"/><path d="M-17 21C-10 18 -4 16 2 12" fill="none" stroke="${s}" stroke-width="2"/><path d="M-8 -22C14 -36 36 -12 24 12C16 28 2 32 -6 26C4 22 8 14 6 6C4 -4 -2 -8 -12 -8C-20 -8 -18 -18 -8 -22Z" fill="${b}"/>`;
- if(a.k==='early')c=`<circle cx="0" cy="0" r="70" fill="var(--art-sac)" stroke="${ring}" stroke-width="2.5"/><circle cx="-41" cy="34" r="8" fill="none" stroke="${s}" stroke-width="2.6"/><g transform="translate(6 2)"><path d="M-12 -8C-30 8 -22 36 4 38C26 38 34 12 22 -8C14 -20 -2 -18 -12 -8Z" fill="${b}"/><circle cx="-8" cy="-24" r="24" fill="${b}"/><path d="M-22 -26q4 3 8 0" fill="none" stroke="var(--art-ink)" stroke-width="2" stroke-linecap="round"/><path d="M-10 4C-18 10 -24 8 -26 2" fill="none" stroke="${s}" stroke-width="7" stroke-linecap="round"/><path d="M6 32C-2 38 -14 36 -16 30" fill="none" stroke="${s}" stroke-width="8" stroke-linecap="round"/></g>`;
- const P={f1:{x:4,y:6,r:0,s:.62,h:31},f2:{x:3,y:9,r:6,s:.76,h:28},f3:{x:3,y:11,r:10,s:.9,h:26.5},f4:{x:2,y:12,r:14,s:1.02,h:25.5},f5:{x:0,y:-10,r:176,s:1.1,h:25}};
- if(P[a.k]){const big=a.k==='f1'||a.k==='f2';c=`${big?`<circle cx="0" cy="0" r="${a.k==='f1'?72:82}" fill="var(--art-sac)" stroke="${ring}" stroke-width="2.5"/>`:''}`+fetusBody(P[a.k])}
- return `<svg class="art" viewBox="-100 -100 200 200" role="img" aria-label="${esc(a.cap)}"><circle cx="0" cy="0" r="96" fill="var(--art-bg)"/>${c}</svg>`}
+const ART_NOTE={4:'배아가 될 세포가 자궁 내막에 자리 잡습니다.',5:'세 겹의 세포층이 생기고 심장과 혈관의 기초가 만들어지기 시작합니다.',6:'뇌와 척수가 될 신경관이 닫히고 작은 팔 싹이 보입니다.',7:'뇌와 얼굴이 자라고 다리 싹이 생기며 팔 싹은 노 모양이 됩니다.',8:'손가락이 생기기 시작하고 윗입술과 코가 만들어집니다.',9:'팔이 자라 팔꿈치가 보이고 발가락과 눈꺼풀이 생깁니다.',10:'머리가 둥글어지고 손가락과 발가락의 물갈퀴가 사라집니다.',11:'태아라고 부르는 시기로, 치아 싹이 보입니다.',12:'손톱이 생기기 시작하고 옆얼굴이 또렷해집니다.',13:'몸이 자라며 사람의 모습이 더 뚜렷해집니다.',14:'목이 뚜렷해지고 비장에서 혈액을 만들기 시작합니다.',15:'뼈가 자라 초음파에서 보이고 머리카락 무늬가 생깁니다.',16:'머리가 곧게 서고 눈이 천천히 움직입니다.',17:'발톱이 자라기 시작하고 몸을 구르며 움직입니다.',18:'귀가 머리에서 도드라지고 소리를 듣기 시작할 수 있습니다.',19:'태지라는 보호막이 피부를 덮기 시작합니다.',20:'절반을 지나는 주로, 태동을 느낄 수 있습니다.',21:'솜털이 몸을 덮고 빠는 반사가 발달합니다.',22:'눈썹과 머리카락이 보입니다.',23:'지문이 될 주름이 생기고 폐가 계면활성제를 만들기 시작합니다.',24:'피부에 주름이 있고 분홍빛을 띠며 비쳐 보입니다.',25:'엄마 목소리 같은 익숙한 소리에 움직일 수 있습니다.',26:'눈썹과 속눈썹이 생깁니다.',27:'지방이 쌓이기 시작해 피부가 조금씩 매끈해집니다.',28:'눈꺼풀을 일부 뜰 수 있습니다.',29:'발차기, 기지개, 잡는 동작을 합니다.',30:'눈을 크게 뜰 수 있고 머리카락이 자랍니다.',31:'주요 발달이 대부분 끝나고 몸무게가 빠르게 늘어납니다.',32:'발톱이 보이고 솜털이 빠지기 시작합니다.',33:'눈동자가 빛에 반응합니다. 뼈는 단단해지지만 머리뼈는 부드럽습니다.',34:'손톱이 손끝까지 자랍니다.',35:'양수 공간을 대부분 채워 움직일 공간이 줄어듭니다.',36:'피부가 매끈해지고 대부분 머리가 아래로 향합니다.',37:'손으로 꽉 잡을 수 있고 머리가 골반으로 내려갈 수 있습니다.',38:'발톱이 발끝까지 자라고 솜털이 대부분 사라집니다.',39:'가슴이 자라고 체온 유지를 돕는 지방이 더 쌓입니다.',40:'출산 예정 주입니다. 예정일 전후로 태어나는 경우가 많습니다.',41:'예정일이 지났습니다. 병원 안내에 따라 아기 상태를 확인합니다.'};
+/* 주차별 값: 사이 주차는 보간해서 매주 조금씩 자라게 함 */
+const ART_K='w s sac rot hr len curl cw bw rw tail arm leg lw dig nek face eye ear hair fat yolk amn plac cord x y'.split(' ');
+const ART_F=[
+ [6,1.3,54,0,8.5,27,165,6,6.5,5,26,5,0,3,0,-10,0,0,0,0,0,8,40,.22,1.6,2,6],
+ [7,1.22,58,0,14,30,150,8,8.5,6.5,18,9,7,3.8,0,-14,.05,.15,0,0,0,8.5,44,.28,2,6,2],
+ [8,1.16,62,0,18,33,132,10,10.5,8.5,10,15,12,4.6,.2,-18,.15,.35,.1,0,0,8.5,50,.34,2.3,6,3],
+ [9,1.08,65,0,21,36,116,11.5,12,10,4,20,17,5.2,.45,-20,.3,.5,.25,0,0,8,56,.4,2.6,6,3],
+ [10,1,68,0,23,40,104,12.5,13,11,0,25,22,5.6,.8,-22,.45,.6,.4,0,0,6.5,62,.45,2.8,5,3],
+ [12,0.92,74,0,25,47,92,13.5,14.5,12.5,0,31,30,6,.95,-22,.7,.7,.7,0,0,0,72,.55,3,3,2],
+ [14,0.94,78,4,25.5,53,84,14,15.5,13.5,0,35,35,6.2,1,-20,.85,.8,.85,0,.05,0,78,.65,3.3,2,2],
+ [16,0.94,82,7,25,57,78,14.5,16,14,0,38,39,6.4,1,-18,.95,.85,1,.05,.1,0,0,.72,3.6,1,2],
+ [20,1.0,86,10,24.5,60,74,15.5,17.5,15.5,0,41,45,7,1,-18,1,.9,1,.3,.2,0,0,.82,4,1,2],
+ [24,1.06,88,13,24.5,62,74,17,19,17,0,42,47,7.6,1,-18,1,.95,1,.5,.35,0,0,.9,4.3,0,2],
+ [28,1.12,88,18,25,63,78,18.5,21,18.5,0,42,47,8.4,1,-20,1,1.4,1,.7,.55,0,0,.95,4.5,0,2],
+ [30,1.16,88,35,25,64,82,19.5,22,19.5,0,42,47,8.8,1,-22,1,1.4,1,.8,.65,0,0,.98,4.6,0,2],
+ [32,1.2,88,75,25,64,86,20,23,20,0,42,47,9.2,1,-24,1,1.4,1,.85,.75,0,0,1,4.7,0,2],
+ [34,1.24,88,130,25,64,90,21,24,21,0,42,47,9.8,1,-26,1,1.4,1,.9,.85,0,0,1,4.8,0,2],
+ [36,1.28,88,160,25,64,94,21.5,25,21.5,0,41,46,10.2,1,-28,1,1.4,1,.95,.95,0,0,1,4.8,0,2],
+ [38,1.3,88,166,25,64,96,22,25.5,22,0,41,46,10.4,1,-28,1,1.4,1,1,1,0,0,1,4.8,0,3],
+ [41,1.32,88,168,25,64,98,22,26,22,0,41,46,10.5,1,-28,1,1.4,1,1,1,0,0,1,4.8,0,4]
+];
+function artP(w){const F=ART_F,a=F.findIndex(r=>r[0]>=w),hi=F[Math.max(0,a<0?F.length-1:a)],lo=F[Math.max(0,(a<0?F.length-1:a)-1)],t=hi[0]===lo[0]?0:Math.min(1,Math.max(0,(w-lo[0])/(hi[0]-lo[0]))),o={};ART_K.forEach((k,i)=>o[k]=lo[i]+(hi[i]-lo[i])*t);return o}
+const artN=n=>n.toFixed(1).replace(/\.0$/,'');
+const artL=(a,b,t)=>a+(b-a)*t;
+const artD=d=>d*Math.PI/180;
+const artDir=(p,ang,l)=>[p[0]+Math.cos(artD(ang))*l,p[1]+Math.sin(artD(ang))*l];
+/* 닫힌 곡선 */
+function artClosed(p){const n=p.length,f=i=>p[(i+n)%n];let d=`M${artN(p[0][0])} ${artN(p[0][1])}`;for(let i=0;i<n;i++){const a=f(i-1),b=f(i),c=f(i+1),e=f(i+2);d+=`C${artN(b[0]+(c[0]-a[0])/6)} ${artN(b[1]+(c[1]-a[1])/6)} ${artN(c[0]-(e[0]-b[0])/6)} ${artN(c[1]-(e[1]-b[1])/6)} ${artN(c[0])} ${artN(c[1])}`}return d+'Z'}
+function artOpen(p){const n=p.length,f=i=>p[Math.min(n-1,Math.max(0,i))];let d=`M${artN(p[0][0])} ${artN(p[0][1])}`;for(let i=0;i<n-1;i++){const a=f(i-1),b=f(i),c=f(i+1),e=f(i+2);d+=`C${artN(b[0]+(c[0]-a[0])/6)} ${artN(b[1]+(c[1]-a[1])/6)} ${artN(c[0]-(e[0]-b[0])/6)} ${artN(c[1]-(e[1]-b[1])/6)} ${artN(c[0])} ${artN(c[1])}`}return d}
+/* 가늘어지는 팔다리 */
+function artLimb(pts,w0,w1,wm){const n=pts.length-1,L=[],R=[];for(let i=0;i<=n;i++){const a=pts[Math.max(0,i-1)],b=pts[Math.min(n,i+1)],dx=b[0]-a[0],dy=b[1]-a[1],h=Math.hypot(dx,dy)||1,t=i/n,w=wm==null?artL(w0,w1,t):(t<.5?artL(w0,wm,t*2):artL(wm,w1,(t-.5)*2));L.push([pts[i][0]-dy/h*w,pts[i][1]+dx/h*w]);R.push([pts[i][0]+dy/h*w,pts[i][1]-dx/h*w])}const m=Math.floor(n/2),c=(pts[m][0]-pts[0][0])*(pts[n][1]-pts[m][1])-(pts[m][1]-pts[0][1])*(pts[n][0]-pts[m][0]),o=c<0?L:R,k=Math.ceil(n*.2);return{d:artClosed(L.concat(R.slice().reverse())),edge:artOpen(o.slice(k))}}
+function artSmooth(p,n=3){for(let k=0;k<n;k++){const o=[p[0]];for(let i=0;i<p.length-1;i++){const a=p[i],b=p[i+1];o.push([a[0]*.75+b[0]*.25,a[1]*.75+b[1]*.25],[a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75])}o.push(p[p.length-1]);p=o}return p.filter((q,i)=>i%2===0||i===p.length-1)}
+function artHand(p,ang,r,dig,fill,line){const ray=(e,w,c)=>`<path d="M${artN(p[0])} ${artN(p[1])}L${artN(e[0])} ${artN(e[1])}" stroke="${c}" stroke-width="${artN(w)}" stroke-linecap="round" fill="none"/>`,l=r*(.2+.62*dig),w=r*.46,F=[];if(dig>.05){for(const[a,k]of [[-27,.85],[-9,1],[9,1],[27,.86]])F.push([artDir(p,ang+a,r*.7+l*k),w]);F.push([artDir(p,ang+64,r*.7+l*.62),w*1.1])}let u='',o='';if(line){u=`<circle cx="${artN(p[0])}" cy="${artN(p[1])}" r="${artN(r+.6)}" fill="${line}"/>`+F.map(([e,v])=>ray(e,v+1.2,line)).join('')}o=`<circle cx="${artN(p[0])}" cy="${artN(p[1])}" r="${artN(r)}" fill="${fill}"/>`+F.map(([e,v])=>ray(e,v,fill)).join('');return u+o}
+function artFoot(p,ang,r,dig,fill){const e=artDir(p,ang,r*1.7);let s=`<path d="M${artN(p[0])} ${artN(p[1])}L${artN(e[0])} ${artN(e[1])}" stroke="${fill}" stroke-width="${artN(r*1.7)}" stroke-linecap="round" fill="none"/>`;if(dig>.3)for(let i=0;i<4;i++){const q=artDir(e,ang+(i-1.5)*24,r*.85);s+=`<circle cx="${artN(q[0])}" cy="${artN(q[1])}" r="${artN(r*.3)}" fill="${fill}"/>`}return s}
+/* 머리: 얼굴 쪽이 왼쪽 */
+function artHead(p){const P=[[0,-1],[-.46,-.92],[-.8,-.62],[-.95,-.24],[-.96,-.06],[-1.05,.12],[-.97,.24],[-.99,.35],[-.93,.46],[-.92,.6],[-.78,.76],[-.45,.84],[0,.88],[.55,.82],[.92,.45],[1.02,-.08],[.82,-.6],[.45,-.92]];
+ const circ=(q)=>{const h=Math.hypot(q[0],q[1])||1;return[q[0]/h,q[1]/h]};
+ return P.map(q=>{const c=circ(q);return[artL(c[0],q[0],p.face),artL(c[1],q[1],p.face)]})}
+function fetusArt(p){const b='var(--art-body)',s='var(--art-shade)',i='var(--art-ink)',th0=62,st=10,tl=p.tail;
+ const pts=[];let x=0,y=0;const total=p.len+tl;for(let k=0;k<=st;k++){const t=k/st,a=th0+p.curl*t;pts.push({x,y,a});const ds=total/st;x+=Math.cos(artD(a))*ds;y+=Math.sin(artD(a))*ds}
+ const bt=p.len/total,at=t=>pts[Math.min(st,Math.round(t*st))];
+ const wid=t=>{const u=t/bt;if(u>1)return Math.max(.4,artL(p.rw,.4,(u-1)/(1-bt||1)*bt/(bt||1)*1));return u<.2?artL(p.cw*.8,p.cw,u/.2):u<.6?artL(p.cw,p.bw,(u-.2)/.4):artL(p.bw,p.rw,(u-.6)/.4)};
+ const back=[],front=[];pts.forEach((q,k)=>{const t=k/st,n=[Math.sin(artD(q.a)),-Math.cos(artD(q.a))],w=wid(t);if(tl>0&&t>bt){const f=1-(t-bt)/(1-bt),v=Math.max(.5,p.rw*f*.9);back.push([q.x+n[0]*v,q.y+n[1]*v]);front.unshift([q.x-n[0]*v,q.y-n[1]*v])}else{back.push([q.x+n[0]*w*.92,q.y+n[1]*w*.92]);front.unshift([q.x-n[0]*w*1.08,q.y-n[1]*w*1.08])}});
+ const end=pts[st],cap=artDir([end.x,end.y],end.a,tl>0?.8:p.rw*.75);const torso=artClosed(back.concat([cap],front));
+ const hc=artDir([0,0],th0+180+14,p.hr*.78),hp=artHead(p);
+ const sp=t=>{const o=at(t),n=[Math.sin(artD(o.a)),-Math.cos(artD(o.a))];return{p:[o.x,o.y],a:o.a,n}};
+ const off=(t,k)=>{const o=sp(t),w=wid(t*bt);return[o.p[0]-o.n[0]*w*k,o.p[1]-o.n[1]*w*k]};
+ /* 팔다리 */
+ const armS=off(.14*bt,.25),legS=off(.86*bt,.1),aL=p.arm,lL=p.leg,lw=p.lw;
+ const tuck=p.fat,tha=206+26*tuck,sha=104-36*tuck;
+ const mkArm=(S,da)=>{const q=aL*(1-.34*tuck),E=artDir(S,122-8*tuck+da,q*.5),W=artDir(E,200+8*tuck+da,q*.5);return{pts:artSmooth([S,E,W]),W,ang:196+10*tuck+da}};
+ const mkLeg=(S,da)=>{const K=artDir(S,tha+da,lL*.54),A=artDir(K,sha+da,lL*.46);return{pts:artSmooth([S,K,A]),A,ang:sha+78+da}};
+ let g='';const showL=p.arm>0,rLimb=lw;
+ /* 먼 쪽 */
+ if(showL){const fa=mkArm(off(.14*bt,.1),-16),fl=mkLeg(off(.84*bt,.2),-14);g+=`${lL>2?`<path d="${artLimb(fl.pts,lw*1.2,lw*.55,lw*.8).d}" fill="${s}"/>${artFoot(fl.A,fl.ang,lw*.72,p.dig,s)}`:''}<path d="${artLimb(fa.pts,lw*.72,lw*.45,lw*.55).d}" fill="${s}"/>${aL>=8?artHand(fa.W,fa.ang,lw*.6,p.dig,s):''}`}
+ g+=`<path d="${torso}" fill="url(#artT)"/>`;
+ /* 등뼈 표현: 초기에는 마디 */
+ if(p.tail>4){for(let k=2;k<st;k++){const q=pts[k],n=[Math.sin(artD(q.a)),-Math.cos(artD(q.a))],v=wid(k/st)*.55;g+=`<circle cx="${artN(q.x+n[0]*v)}" cy="${artN(q.y+n[1]*v)}" r="${artN(Math.max(.6,p.cw*.11))}" fill="${s}"/>`}}
+ /* 심장 부위 */
+ if(p.w<=9.5){const o=off(.22*bt,.75),r=p.cw*.42*(p.w>8?artL(1,.7,p.w-8):1);g+=`<circle cx="${artN(o[0])}" cy="${artN(o[1])}" r="${artN(r)}" fill="var(--art-heart)"/>`}
+ /* 머리 */
+ const eyeX=-.56+(.22)*(1-p.face),eyeY=.1+.12*(1-p.face),hl=p.hr;
+ let h=`<path d="${artClosed(hp)}" fill="${b}"/>`;
+ if(p.fat>.02)h+=`<ellipse cx="-.52" cy=".42" rx=".27" ry=".19" fill="var(--art-heart)" opacity="${artN(.1+.2*p.fat)}"/>`;
+ if(p.eye>.05){if(p.eye<1.3)h+=`<path d="M${eyeX-.14} ${eyeY}q.14 ${artN(.1*p.face+.02)} .28 0" fill="none" stroke="${i}" stroke-width="${artN(.045)}" stroke-linecap="round" opacity="${Math.min(1,p.eye+.2).toFixed(2)}"/>`;else h+=`<ellipse cx="${eyeX}" cy="${eyeY+.01}" rx=".06" ry=".07" fill="${i}"/>`}
+ if(p.hair>.38)h+=`<path d="M${eyeX-.13} ${eyeY-.24}q.15 -.08 .3 0" fill="none" stroke="${i}" stroke-width=".03" stroke-linecap="round" opacity="${artN(p.hair)}"/>`;
+ if(p.face>.5)h+=`<path d="M-.92 .4q.08 .05 .16 .01" fill="none" stroke="${i}" stroke-width=".035" stroke-linecap="round" opacity=".75"/>`;
+ if(p.ear>.05){const ey=.32-.1*p.ear;h+=`<path d="M.2 ${ey-.14}c.15 -.1 .26 .06 .17 .18c-.05 .08 -.1 .08 -.13 .16" fill="none" stroke="${s}" stroke-width=".07" stroke-linecap="round"/>`}
+ if(p.hair>.38)h+=`<path d="M-.62 -.74C-.3 -1.04 .4 -1.06 .78 -.62C.98 -.38 1.03 -.12 1 .1C.86 -.32 .5 -.62 .05 -.74C-.2 -.8 -.45 -.8 -.62 -.74Z" fill="${i}" opacity="${(p.hair*.22).toFixed(2)}"/>`;
+ g+=`<g transform="translate(${artN(hc[0])} ${artN(hc[1])}) rotate(${artN(p.nek)}) scale(${artN(hl)})">${h}</g>`;
+ /* 가까운 쪽 */
+ if(showL){const na=mkLeg(legS,0),ar=mkArm(armS,0),ll=artLimb(na.pts,lw*1.35,lw*.6,lw*.95),al=artLimb(ar.pts,lw*.8,lw*.48,lw*.6),ln=(d,w)=>`<path d="${d}" fill="none" stroke="${s}" stroke-width="${w}" stroke-linecap="round"/>`;g+=`${lL>2?`<path d="${ll.d}" fill="${b}"/>${artFoot(na.A,na.ang,lw*.76,p.dig,b)}${ln(ll.edge,1)}`:''}<path d="${al.d}" fill="${b}"/>${aL>=8?artHand(ar.W,ar.ang,lw*.64,p.dig,b,aL>=14?s:null):''}${ln(al.edge,.9)}`}
+ return{g,belly:off(.58*bt,1.02),c:[(hc[0]+end.x)/2-3,(hc[1]+end.y)/2]}}
+function artSvg(w){const a=ART_STAGES.find(x=>w<=x.to)||ART_STAGES[ART_STAGES.length-1],ring='var(--art-ring)',s0='var(--art-shade)';let c='';
+ const box=x=>`<svg class="art" viewBox="-100 -100 200 200" role="img" aria-label="${esc(a.cap)}"><defs><linearGradient id="artT" x1="1" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color:var(--art-shade)"/><stop offset=".38" style="stop-color:var(--art-body)"/></linearGradient></defs><circle r="97" fill="var(--art-bg)"/>${x}</svg>`;
+ if(w<=4)return box(`<path d="M-97 18C-50 8 -20 26 20 18S70 4 97 14" fill="none" stroke="${ring}" stroke-width="2.5"/><g transform="translate(0 6)"><circle r="17" fill="var(--art-sac)" stroke="${ring}" stroke-width="2"/><circle cx="-5" cy="6" r="6" fill="var(--art-body)"/><circle cx="3" cy="8" r="5" fill="var(--art-body)"/><circle cx="-1" cy="1" r="4.6" fill="${s0}"/></g>`);
+ if(w<=5)return box(`<circle cx="0" cy="0" r="74" fill="none" stroke="${ring}" stroke-width="2" stroke-dasharray="2 6"/><circle r="38" fill="var(--art-sac)" stroke="${ring}" stroke-width="2.5"/><circle cx="-8" cy="12" r="7" fill="none" stroke="${s0}" stroke-width="2"/><path d="M1 12c5 -1 8 -4 8 -8" fill="none" stroke="var(--art-body)" stroke-width="4.5" stroke-linecap="round"/>`);
+ const p=artP(w),f=fetusArt(p),tr=`translate(${artN(p.x)} ${artN(p.y)}) rotate(${artN(p.rot)}) scale(${p.s.toFixed(3)}) translate(${artN(-f.c[0])} ${artN(-f.c[1])})`;
+ const ca=artD(p.rot),bx=f.belly[0]-f.c[0],by=f.belly[1]-f.c[1],be=[p.x+(bx*Math.cos(ca)-by*Math.sin(ca))*p.s,p.y+(bx*Math.sin(ca)+by*Math.cos(ca))*p.s];
+ const R=p.sac,pa0=-96,pa1=-20,pl=artL(5,12,p.plac),mid=(pa0+pa1)/2,on=(a,r)=>[Math.cos(artD(a))*r,Math.sin(artD(a))*r],pbase=[],ptop=[];for(let k=0;k<=8;k++){const q=artL(pa0,pa1,k/8),bulge=Math.sin(k/8*Math.PI);pbase.push(on(q,R+.5));ptop.unshift(on(q,R-pl*bulge*(1+.14*Math.sin(k*2.2))))}
+ const pc=on(mid,R-pl),turn=Math.min(1,p.rot/120),ctl=turn>=1?[pc,[artL(pc[0],be[0],.5)+6,artL(pc[1],be[1],.5)],be]:[pc,[R*.72*(1-turn)+pc[0]*turn,R*.3],[R*.32*(1-turn)+be[0]*turn,R*.8*(1-turn)+be[1]*turn],[be[0]-4,be[1]+R*.3*(1-turn)],be];
+ let u=`<circle r="${artN(R+5)}" fill="none" stroke="${ring}" stroke-width="1.6" stroke-dasharray="1.5 5"/><circle r="${artN(R)}" fill="var(--art-sac)" stroke="${ring}" stroke-width="2.5"/>`;
+ if(p.amn>0&&w<=13)u+=`<circle cx="4" cy="2" r="${artN(p.amn)}" fill="none" stroke="${ring}" stroke-width="1.2" opacity=".85"/>`;
+ u+=`<path d="${artClosed(pbase.concat(ptop))}" fill="${s0}" opacity=".85"/>`;
+ u+=`<path d="${artOpen(ctl)}" fill="none" stroke="var(--art-cord)" stroke-width="${artN(p.cord)}" stroke-linecap="round"/><path d="${artOpen(ctl)}" fill="none" stroke="var(--art-sac)" stroke-width="${artN(p.cord*.28)}" stroke-dasharray="1.5 3.5" opacity=".75"/>`;
+ if(p.yolk>0){const yc=on(150,R*.62);u+=`<path d="M${artN(yc[0])} ${artN(yc[1])}L${artN(be[0])} ${artN(be[1])}" stroke="${s0}" stroke-width="1.4"/><circle cx="${artN(yc[0])}" cy="${artN(yc[1])}" r="${artN(p.yolk)}" fill="var(--art-sac)" stroke="${s0}" stroke-width="2"/>`}
+ return box(`${u}<g transform="${tr}">${f.g}</g>`)}
 function sizeOf(w){const m=(WEEKS[w].baby.match(/약 ([\d.]+)(mm|cm)/)||[]);return m[1]?Number(m[1])*(m[2]==='cm'?10:1):510}
 function sizeScale(w){const W=280,L=14,R=14,lo=Math.log10(.1),hi=Math.log10(600),X=v=>L+(Math.log10(v)-lo)/(hi-lo)*(W-L-R),v=sizeOf(w),x=X(v),ticks=[[1,'1mm'],[10,'1cm'],[100,'10cm'],[500,'50cm']];
  return `<svg class="scale" viewBox="0 0 ${W} 40" role="img" aria-label="아기 크기 눈금"><line x1="${L}" x2="${W-R}" y1="14" y2="14" class="s0"/><line x1="${L}" x2="${x.toFixed(1)}" y1="14" y2="14" class="s1"/>${ticks.map(([t,l])=>`<line x1="${X(t).toFixed(1)}" x2="${X(t).toFixed(1)}" y1="9" y2="19" class="s0"/><text x="${X(t).toFixed(1)}" y="35" text-anchor="middle">${l}</text>`).join('')}<circle cx="${x.toFixed(1)}" cy="14" r="6" class="s2"/></svg>`}
