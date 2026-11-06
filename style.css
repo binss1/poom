@@ -225,3 +225,6 @@ label.btn{cursor:pointer}
 .supi b{font-size:.86rem}
 .term{color:inherit;text-decoration:underline dotted var(--acc);text-decoration-thickness:1.5px;text-underline-offset:3px}
 .gl+.gl{margin-top:6px}
+.qa{display:block;margin-top:6px;padding:8px 10px;border-radius:9px;background:var(--sf2);font-size:.9rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.qrow{align-items:flex-start;padding-block:12px}
+.qrow>svg,.qrow>.small{margin-top:2px}
