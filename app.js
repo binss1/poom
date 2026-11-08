@@ -1,5 +1,5 @@
 'use strict';
-const SIM=!!window.POOM_SIM, NS=SIM?'poom-sim':'poom', VERSION='1.1.0', BUILD='25504f9f', KEY=NS+'.db';
+const SIM=!!window.POOM_SIM, NS=SIM?'poom-sim':'poom', VERSION='1.1.0', BUILD='4c8ff070', KEY=NS+'.db';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
@@ -198,6 +198,7 @@ function vToday(){const p=db.profile,t=today(),hide=p.hideGuide,g=ga(t),st=daySt
  if(born()&&!hide){const pd=ppDue(),n=ppDays();if(pd.length)h+=`<section class="sec"><div class="sech"><h2>산후 할 일</h2><button class="link" data-a="tab" data-v="guide">전체 보기</button></div><div class="list">${pd.slice(0,5).map(x=>ppRow(x,n)).join('')}</div></section>`}
  if(!hide&&lmp()){const w=clampW(wk(t)),wd=WEEKS[w],ms=nextMs(),ex=exToday(t),dd=db.days[t]||{},md=dd.meal||{},ml=Object.keys(md).filter(k=>md[k]).length;
   h+=`<section class="sec"><div class="sech"><h2>오늘 챙길 것</h2></div><div class="list">`;
+  if(!born()&&BODY[w])h+=liBtn(`bodyOpen" data-v="${w}`,'이번 주 몸의 변화',esc(bodySum(w)));
   if(!born())h+=liBtn('tab" data-v="guide',`${w}주: ${esc(wd.head)}`,ms?`다음 ${esc(ms.title)} ${fmtMD(msRange(ms)[0])}~${fmtMD(msRange(ms)[1])} 예상`:'');
   h+=liBtn('exSheet',`운동: ${esc(ex.s.t)}`,dd.ex&&dd.ex.done?'완료':ex.s.min?`${ex.s.min}분 · ${ex.s.lv}`:'쉬어가는 날');
   h+=liBtn('mealSheet','식단과 물',`끼니 ${ml}/5 · 물 ${dd.water||0}컵`);
@@ -237,11 +238,12 @@ function upcomingNote(s){const a=planStat(s).items;return a.length?`<div class="
 
 /* 주차 안내 */
 function vPP(){const n=ppDays(),grp=['산모','아기','서류'];return `<div class="note info"><b>산후 ${n}일</b><span>날짜는 출산일 기준 일반 일정입니다. 병원과 보건소 안내를 우선하세요.</span></div>${grp.map(w=>`<section class="sec"><h2 style="font-size:1rem">${w}</h2><div class="list">${PP.filter(x=>x.who===w).map(x=>ppRow(x,n)).join('')}</div></section>`).join('')}<div class="list">${liBtn('supBirth','지원 제도 출산 후 항목','신청 방법과 서류')}${liBtn('ppWeeks','임신 주차 안내 다시 보기','')}</div>`}
+function bodySec(w){const L=BODY[w];if(!L)return '';ui.bdo=ui.bdo||{};return `<section class="sec" id="bodySec"><div class="sech"><h2>이번 주 몸의 변화</h2></div><div class="bdl">${L.map(([k,d,v],i)=>{const m=BSYM[k],id=w+':'+i;return `<details class="bd" data-bd="${id}" ${ui.bdo[id]?'open':''}><summary><span class="grow t">${esc(m.t)}</span>${I.chev}</summary><div class="bdb"><p>${gt(d)}</p><div class="lst c"><h3>이렇게 해 보세요</h3><ul>${m.a.map(x=>`<li>${gt(x)}</li>`).join('')}</ul></div>${v?`<div class="note info"><b>시험관 임신이라면</b><span>${gt(v)}</span></div>`:''}<div class="note warn"><b>병원에 연락할 때</b><span>${gt(m.r)}</span></div></div></details>`}).join('')}</div><div class="small faint">흔한 변화를 정리한 일반 정보이며 사람마다 다릅니다. 병원 안내를 우선하세요.</div></section>`}
 function vGuide(){const t=today();if(born()&&!ui.guide)ui.guide='pp';ui.gw=ui.gw||clampW(wk(t));if(!lmp())return `<div class="stack"><div class="ptitle">주차 안내</div><div class="note info"><span>설정에서 이식일이나 출산 예정일을 입력하면 주차별 안내가 표시됩니다.</span></div><button class="btn" data-a="go" data-v="settings">설정 열기</button></div>`;
  const tab=ui.guide;let b='';
  if(tab==='week'){const w=ui.gw,x=WEEKS[w],l=lmp(),a=add(l,w*7),e=add(a,6),mn=MULTI_NOTES.find(n=>w>=n[0]&&w<=n[1]);
   b=`<div class="weekbar"><button class="icb" data-a="gw" data-v="-1" aria-label="이전 주">${I.back}</button><div class="grow" style="text-align:center"><div class="w">${w}주${w===wk(t)?' <span class="small muted">이번 주</span>':''}</div><div class="small muted num">${fmtMD(a)}~${fmtMD(e)}</div></div><button class="icb" data-a="gw" data-v="1" aria-label="다음 주">${I.next}</button></div>
-  <h2 style="font:700 1.25rem/1.3 var(--d)">${gt(x.head)}</h2><div class="artrow">${artSvg(w)}<div class="grow"><div class="small muted">아기 크기(대략)</div><div class="t">${esc(x.baby)}</div><div class="small muted artnote">${gt(ART_NOTE[w]||'')}</div></div></div>${sizeScale(w)}<div class="small faint">그림은 발달 순서를 보여주는 단순한 표현이며 실제 모습이나 크기 비율과 다릅니다. 초기 그림은 크게 확대했고, 자세와 내용은 아기마다 다를 수 있습니다. 길이는 19주까지 머리부터 엉덩이, 20주부터 머리부터 발까지입니다.</div><div class="prose">${lst('c','확인할 일',x.check)}${lst('g','고려할 점',x.consider)}${lst('w','주의할 점',x.caution)}</div>`;
+  <h2 style="font:700 1.25rem/1.3 var(--d)">${gt(x.head)}</h2><div class="artrow">${artSvg(w)}<div class="grow"><div class="small muted">아기 크기(대략)</div><div class="t">${esc(x.baby)}</div><div class="small muted artnote">${gt(ART_NOTE[w]||'')}</div></div></div>${sizeScale(w)}<div class="small faint">그림은 발달 순서를 보여주는 단순한 표현이며 실제 모습이나 크기 비율과 다릅니다. 초기 그림은 크게 확대했고, 자세와 내용은 아기마다 다를 수 있습니다. 길이는 19주까지 머리부터 엉덩이, 20주부터 머리부터 발까지입니다.</div>${bodySec(w)}<div class="prose">${lst('c','확인할 일',x.check)}${lst('g','고려할 점',x.consider)}${lst('w','주의할 점',x.caution)}</div>`;
   if(mn&&Number(db.profile.fetus)!==1)b+=`<div class="note info"><b>다태 임신이라면</b><span>${gt(mn[2])}</span></div>`;
   if(!born())b+=`<div class="list">${liBtn('go" data-v="flight','항공 여행 안내',`이 주차 아시아나 기준: ${esc(flightRule(w*7).t)}`)}</div>`;
   b+=photoSection(w);
@@ -521,6 +523,7 @@ const ACT={
   if(rx!=='same'){view='more';stack=['meds'];render();scrollTo(0,0);toast(rx==='stop'?'중단할 약을 눌러 마지막 날을 넣어 주세요':'바뀐 처방을 입력해 주세요');return}
   render();toast(nd?`진료 기록과 ${fmtMD(nd)} 다음 진료를 저장했습니다`:'진료 기록을 저장했습니다')},
  logQ(){closeSheet();view='log';ui.log='q';stack=[];render();scrollTo(0,0)},
+ bodyOpen(d){const w=+d.v;view='guide';ui.guide='week';ui.gw=w;stack=[];ui.bdo=ui.bdo||{};ui.bdo[w+':0']=1;render();const e=document.getElementById('bodySec');if(e)e.scrollIntoView({block:'start'});else scrollTo(0,0)},
  guideSched(){view='guide';ui.guide='sched';stack=[];render();scrollTo(0,0)},
  rxQ(d){const m=db.meds.find(x=>x.id===d.v);if(!m)return;const r=remaining(m),od=outDate(m);db.questions.push({id:uid(),text:`${m.name} 처방 필요 (남은 약 ${r}회분${od?`, ${fmtMD(od)}에 부족`:''})`,done:false,answer:'',qDate:today(),aDate:'',rx:m.id});save();render();toast('질문 목록에 추가했습니다')},
  gradAppt(){apptSheet(null,today(),'산부인과 첫 진료')},
@@ -592,7 +595,8 @@ const ACT={
  async updateNow(){await save();try{sessionStorage.setItem(NS+'.upd','1')}catch(e){}location.reload()},
  async pwaInstall(){const p=window.__bip;if(p){p.prompt();await p.userChoice;window.__bip=null;render()}}
 };
-document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el)return;const a=ACT[el.dataset.a];if(a){if(el.dataset.a==='scrim'&&e.target!==el)return;a(el.dataset,el,e)}});
+document.addEventListener('toggle',e=>{const el=e.target;if(el.dataset&&el.dataset.bd){ui.bdo=ui.bdo||{};ui.bdo[el.dataset.bd]=el.open?1:0}},true);
+addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el)return;const a=ACT[el.dataset.a];if(a){if(el.dataset.a==='scrim'&&e.target!==el)return;a(el.dataset,el,e)}});
 document.addEventListener('change',e=>{if(e.target.id==='sBase'){ACT.collectSettings();render();return}if(e.target.id==='mRep'){ui.mr.k=e.target.value;$('#mRepBox').innerHTML=medRepBox();medPrev();return}if(['mEvery','mSt','mEff','mE'].includes(e.target.id)){medPrev();return}if(e.target.id==='flA'||e.target.id==='flB'){ui[e.target.id]=e.target.value;$('#flR').innerHTML=flightBox();return}const c=e.target.dataset&&e.target.dataset.c;if(!c)return;const v=e.target.dataset.v;
  if(c==='photo'){const f=e.target.files&&e.target.files[0];e.target.value='';if(f)pickPhoto(f);return}
  if(c==='calCleared'){const on=e.target.checked,b=$('#calSendBtn'),l=$('#calSafari');if(b)b.disabled=!on;if(l)l.hidden=!on}
