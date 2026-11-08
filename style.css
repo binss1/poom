@@ -235,3 +235,6 @@ label.btn{cursor:pointer}
 .uscard{display:flex;flex-direction:column;gap:8px;background:var(--sf);border:1px solid var(--line);border-radius:14px;padding:10px 12px 12px}
 .ushd{display:flex;align-items:center;gap:8px;text-align:left;width:100%;min-height:40px}
 .ushd .ev{font-size:.72rem;padding:4px 7px}
+.grid3{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,.9fr);gap:8px}
+.chart .band{fill:var(--acc-soft);stroke:none}
+.note .list{margin-top:8px;color:var(--ink)}
