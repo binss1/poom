@@ -1,5 +1,5 @@
 'use strict';
-const SIM=!!window.POOM_SIM, NS=SIM?'poom-sim':'poom', VERSION='1.1.0', BUILD='4c8ff070', KEY=NS+'.db';
+const SIM=!!window.POOM_SIM, NS=SIM?'poom-sim':'poom', VERSION='1.1.0', BUILD='5ebee68e', KEY=NS+'.db';
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
@@ -378,7 +378,7 @@ function summaryText(){const p=db.profile,t=today(),from=add(t,-13),g=ga(t),l=[]
  const labs=db.labs.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);if(labs.length){l.push('','[최근 수치]');for(const x of labs)l.push(`- ${fmtMD(x.date)} ${x.name} ${x.value} ${x.unit||''}`)}
  const q=db.questions.filter(x=>!x.done);if(q.length){l.push('','[물어볼 질문]');for(const x of q)l.push(`- ${x.text}`)}const ur=usList().filter(r=>r.date<=today()&&r.note).slice(-3);if(ur.length){l.push('','[초음파 소견]');for(const r of ur)l.push(`- ${fmtYMD(r.date)}: ${r.note.replace(/\s*\n\s*/g,' ')}`)}const nu=usList().find(r=>r.date>today());if(nu)l.push(`- 다음 초음파 예정: ${fmtYMD(nu.date)}`);const qa=db.questions.filter(x=>x.done&&x.answer).sort((a,b)=>(b.aDate||'').localeCompare(a.aDate||'')).slice(0,10);if(qa.length){l.push('','[받은 답변]');for(const x of qa)l.push(`- ${x.aDate?fmtYMD(x.aDate)+' ':''}${x.text}: ${x.answer.replace(/\s*\n\s*/g,' ')}`)}return l.join('\n')}
 function vSummary(){return `<div class="stack">${head('진료 요약')}<textarea id="sumText" rows="16" readonly style="min-height:320px" aria-label="진료 요약">${esc(summaryText())}</textarea><button class="btn" data-a="copy" data-v="sumText">요약 복사</button><div class="small faint">진료실에서 이 화면을 보여주거나 복사해 메모에 붙일 수 있습니다.</div></div>`}
-const SUP_DATE='2026년 11월 4일';
+const SUP_DATE='2026년 11월 9일';
 const supDone=x=>!!db.checks['s_'+x.id];
 function supNow(){const t=today(),p=db.profile;if(born()){const left=x=>x.dl-diff(t,p.birthDate);return SUPPORT.filter(x=>x.dl&&!supDone(x)&&left(x)>=0).sort((a,b)=>left(a)-left(b)).map(x=>({x,left:left(x)}))}const w=wk(t);if(w==null)return[];return SUPPORT.filter(x=>x.now&&!supDone(x)&&x.now.some(([a,b])=>w>=a&&w<=b)).map(x=>({x}))}
 const telify=s=>esc(s).replace(/\d{2,4}-\d{3,4}-\d{4}|\d{4}-\d{4}|\b1\d{2}(?:\d)?\b/g,m=>`<a href="tel:${m.replace(/-/g,'')}">${m}</a>`);
