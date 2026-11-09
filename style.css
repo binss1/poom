@@ -247,3 +247,7 @@ label.btn{cursor:pointer}
 .bdb{display:flex;flex-direction:column;gap:10px;padding:0 12px 14px;line-height:1.6}
 .bdb ul{padding-left:1.1em;display:flex;flex-direction:column;gap:3px}
 #bodySec{scroll-margin-top:12px}
+.sp-acc{color:var(--acc);background:var(--acc-s,var(--sf2))}
+.sp-ink2{color:var(--ink2);background:var(--sf2,var(--line))}
+.sp-bad{color:var(--bad);background:var(--bad-s)}
+#supplSec{scroll-margin-top:12px}
