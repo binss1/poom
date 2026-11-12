@@ -251,3 +251,4 @@ label.btn{cursor:pointer}
 .sp-ink2{color:var(--ink2);background:var(--sf2,var(--line))}
 .sp-bad{color:var(--bad);background:var(--bad-s)}
 #supplSec{scroll-margin-top:12px}
+.appc{background:var(--sf);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
